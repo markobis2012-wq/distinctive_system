@@ -1,0 +1,19 @@
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env*.local
+
+# Backend Go binaries
+backend/api.exe
+backend/api
+*.exe
+
+# User Uploaded Files (Do not sync large attachments/images to Git)
+backend/supplier_product/
+backend/company_attachments/
+
+# OS Files
+.DS_Store
+Thumbs.db
