@@ -65,13 +65,13 @@ type BiddingFilters struct {
 	BidEnd      string
 }
 
-func GetBiddings(f BiddingFilters) ([]Bidding, int, error) {
+func GetBiddings(f BiddingFilters) ([]Bidding, int, int, int, error) {
 	offset := (f.Page - 1) * f.Limit
 
 	whereClauses := []string{"b.is_active = 1"}
 	var args []interface{}
 
-	// 1. Global Search (Expanded to include Title)
+	// 1. Global Search
 	if f.Search != "" {
 		searchParam := "%" + f.Search + "%"
 		whereClauses = append(whereClauses, "(b.reference_no LIKE ? OR b.solicitation_no LIKE ? OR b.procuring_entity LIKE ? OR b.title LIKE ?)")
@@ -151,11 +151,20 @@ func GetBiddings(f BiddingFilters) ([]Bidding, int, error) {
 		order = "ASC"
 	}
 
-	// Execute COUNT Query
-	var total int
-	countQuery := "SELECT COUNT(*) FROM tbl_bidding b LEFT JOIN island_group ig ON b.island_group_id = ig.island_group_id LEFT JOIN tbl_regions r ON b.region_id = r.region_id " + whereString
-	if err := config.DB.QueryRow(countQuery, args...).Scan(&total); err != nil {
-		return nil, 0, err
+	// Execute COUNT Query (Now extracts Total, Upcoming Bids, and Upcoming Pre-bids dynamically)
+	var total, upcomingBids, upcomingPreBids int
+	countQuery := `
+		SELECT 
+			COUNT(*), 
+			COALESCE(SUM(CASE WHEN DATE(b.closing_date_time) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN DATE(b.pre_bid_datetime) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END), 0)
+		FROM tbl_bidding b 
+		LEFT JOIN island_group ig ON b.island_group_id = ig.island_group_id 
+		LEFT JOIN tbl_regions r ON b.region_id = r.region_id 
+	` + whereString
+
+	if err := config.DB.QueryRow(countQuery, args...).Scan(&total, &upcomingBids, &upcomingPreBids); err != nil {
+		return nil, 0, 0, 0, err
 	}
 
 	// Execute DATA Query
@@ -182,7 +191,7 @@ func GetBiddings(f BiddingFilters) ([]Bidding, int, error) {
 
 	rows, err := config.DB.Query(dataQuery, args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, 0, err
 	}
 	defer rows.Close()
 
@@ -204,7 +213,38 @@ func GetBiddings(f BiddingFilters) ([]Bidding, int, error) {
 		biddings = []Bidding{}
 	}
 
-	return biddings, total, nil
+	return biddings, total, upcomingBids, upcomingPreBids, nil
+}
+
+func GetBiddingByID(id int) (Bidding, error) {
+	query := `
+		SELECT 
+			b.bidding_id, COALESCE(CAST(b.date_inputted AS CHAR), ''), COALESCE(b.reference_no, ''), COALESCE(b.solicitation_no, ''),
+			COALESCE(b.procuring_entity, ''), COALESCE(b.client_id, 0), COALESCE(b.title, ''), COALESCE(b.full_address, ''),
+			COALESCE(b.island_group_id, 0), COALESCE(b.region_id, 0), COALESCE(b.province_id, 0), COALESCE(b.city_id, 0),
+			COALESCE(b.trade_agreement, ''), COALESCE(b.procurement_mode, ''), COALESCE(b.classification, ''), COALESCE(b.category, ''),
+			COALESCE(b.contact_numbers, ''), COALESCE(b.approved_budget, 0), COALESCE(b.delivery_period, ''),
+			COALESCE(CAST(b.date_published AS CHAR), ''), COALESCE(CAST(b.last_update_time AS CHAR), ''), COALESCE(CAST(b.closing_date_time AS CHAR), ''),
+			COALESCE(b.contact_person, ''), COALESCE(b.contact_person_dept, ''), COALESCE(b.contact_number, ''), COALESCE(b.email, ''),
+			COALESCE(b.alternate_cont_person, ''), COALESCE(b.alternate_cont_dept, ''), COALESCE(b.alt_cont_contacts, ''), COALESCE(b.alt_cont_email, ''),
+			COALESCE(CAST(b.pre_bid_datetime AS CHAR), ''), COALESCE(b.venue, ''), COALESCE(b.itb_status, ''), COALESCE(b.is_active, 1),
+			COALESCE(b.must_join, 0), COALESCE(b.is_rfq, 0), COALESCE(b.note_desc, ''),
+			COALESCE(ig.island_group_name, 'N/A'), COALESCE(r.region_name, 'N/A')
+		FROM tbl_bidding b
+		LEFT JOIN island_group ig ON b.island_group_id = ig.island_group_id
+		LEFT JOIN tbl_regions r ON b.region_id = r.region_id
+		WHERE b.bidding_id = ?`
+
+	var b Bidding
+	err := config.DB.QueryRow(query, id).Scan(
+		&b.BiddingID, &b.DateInputted, &b.ReferenceNo, &b.SolicitationNo, &b.ProcuringEntity, &b.ClientID, &b.Title, &b.FullAddress,
+		&b.IslandGroupID, &b.RegionID, &b.ProvinceID, &b.CityID, &b.TradeAgreement, &b.ProcurementMode, &b.Classification, &b.Category,
+		&b.ContactNumbers, &b.ApprovedBudget, &b.DeliveryPeriod, &b.DatePublished, &b.LastUpdateTime, &b.ClosingDateTime,
+		&b.ContactPerson, &b.ContactPersonDept, &b.ContactNumber, &b.Email, &b.AlternateContPerson, &b.AlternateContDept, &b.AltContContacts, &b.AltContEmail,
+		&b.PreBidDatetime, &b.Venue, &b.ItbStatus, &b.IsActive, &b.MustJoin, &b.IsRfq, &b.NoteDesc,
+		&b.IslandGroupName, &b.RegionName,
+	)
+	return b, err
 }
 
 func AddBidding(b Bidding) error {

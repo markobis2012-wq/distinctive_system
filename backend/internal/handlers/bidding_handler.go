@@ -42,7 +42,7 @@ func HandleGetBiddings(c *gin.Context) {
 		BidEnd:      c.DefaultQuery("bidEnd", ""),
 	}
 
-	biddings, total, err := models.GetBiddings(filters)
+	biddings, total, upcomingBids, upcomingPreBids, err := models.GetBiddings(filters)
 	if err != nil {
 		fmt.Println("DB ERROR:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch biddings"})
@@ -50,8 +50,10 @@ func HandleGetBiddings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":  biddings,
-		"total": total,
+		"data":              biddings,
+		"total":             total,
+		"upcoming_bids":     upcomingBids,
+		"upcoming_pre_bids": upcomingPreBids,
 	})
 }
 
@@ -100,4 +102,14 @@ func HandleDeleteBidding(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Success"})
+}
+
+func HandleGetBiddingByID(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	bidding, err := models.GetBiddingByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Bidding not found"})
+		return
+	}
+	c.JSON(http.StatusOK, bidding)
 }

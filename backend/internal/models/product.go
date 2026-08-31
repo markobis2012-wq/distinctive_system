@@ -62,3 +62,27 @@ func DeleteProduct(productID int) error {
 	_, err := config.DB.Exec("UPDATE tbl_supplier_products SET is_active = 0 WHERE supplier_product_id = ?", productID)
 	return err
 }
+
+func GetProjectByID(id int) (Project, error) {
+	query := `
+		SELECT 
+			p.projects_id, COALESCE(p.dbos_department_id, 0), COALESCE(p.projects_category, ''), p.project_year, p.project_counter,
+			COALESCE(p.project_number, ''), COALESCE(CAST(p.project_date_created AS CHAR), ''), COALESCE(CAST(p.project_date_start_date AS CHAR), ''),
+			COALESCE(CAST(p.project_date_end_date AS CHAR), ''), COALESCE(p.contract_amount, 0), COALESCE(p.project_name, ''),
+			COALESCE(p.bidding_id, 0), COALESCE(p.client_id, 0), COALESCE(p.project_status, 'Today'), p.is_active,
+			COALESCE(c.company_name, 'Unknown'), COALESCE(d.department, 'N/A'), COALESCE(b.reference_no, 'N/A')
+		FROM projects p
+		LEFT JOIN tbl_company c ON p.client_id = c.company_id
+		LEFT JOIN tbl_department d ON p.dbos_department_id = d.department_id
+		LEFT JOIN tbl_bidding b ON p.bidding_id = b.bidding_id
+		WHERE p.projects_id = ? AND p.is_active = 1`
+
+	var p Project
+	err := config.DB.QueryRow(query, id).Scan(
+		&p.ProjectID, &p.DbosDepartmentID, &p.ProjectsCategory, &p.ProjectYear, &p.ProjectCounter, &p.ProjectNumber,
+		&p.ProjectDateCreated, &p.ProjectStartDate, &p.ProjectEndDate, &p.ContractAmount, &p.ProjectName,
+		&p.BiddingID, &p.ClientID, &p.ProjectStatus, &p.IsActive,
+		&p.ClientName, &p.DepartmentName, &p.BiddingReference,
+	)
+	return p, err
+}

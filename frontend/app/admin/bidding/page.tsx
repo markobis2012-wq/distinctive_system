@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, Edit2, Check, X, FileSignature, Filter, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, Check, X, FileSignature, Filter, ArrowUp, ArrowDown, CalendarClock, Calendar } from 'lucide-react';
+import Link from 'next/link';
 
 // --- Custom Searchable Select Dropdown ---
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select...", onAddNew }: any) => {
@@ -86,6 +87,8 @@ export default function BiddingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [upcomingBids, setUpcomingBids] = useState(0);
+  const [upcomingPreBids, setUpcomingPreBids] = useState(0);
   const limit = 20;
 
   const [sortConfig, setSortConfig] = useState({ field: 'bidding_id', order: 'desc' });
@@ -130,6 +133,8 @@ export default function BiddingPage() {
         const json = await res.json();
         setBiddings(json.data);
         setTotalRecords(json.total);
+        setUpcomingBids(json.upcoming_bids);
+        setUpcomingPreBids(json.upcoming_pre_bids);
       }
     } catch (err) {}
   };
@@ -159,6 +164,28 @@ export default function BiddingPage() {
   const clearFilters = () => {
     setFilters({ company: 0, island: 0, region: 0, province: 0, city: 0, preBidStart: '', preBidEnd: '', bidStart: '', bidEnd: '' });
     setSearchQuery('');
+    setPage(1);
+  };
+
+  const apply7DayFilter = (type: 'bidding' | 'pre_bidding') => {
+    // Calculate local timezone dates correctly
+    const today = new Date();
+    const localToday = new Date(today.getTime() - (today.getTimezoneOffset() * 60000));
+    const nextWeek = new Date(localToday);
+    nextWeek.setDate(localToday.getDate() + 7);
+
+    const start = localToday.toISOString().split('T')[0];
+    const end = nextWeek.toISOString().split('T')[0];
+
+    setFilters(prev => ({
+      ...prev,
+      bidStart: type === 'bidding' ? start : '',
+      bidEnd: type === 'bidding' ? end : '',
+      preBidStart: type === 'pre_bidding' ? start : '',
+      preBidEnd: type === 'pre_bidding' ? end : ''
+    }));
+    
+    setShowFilters(true); // Open the drawer so the user sees the dates were filled in!
     setPage(1);
   };
 
@@ -306,6 +333,24 @@ export default function BiddingPage() {
           )}
         </div>
 
+        <div className="px-4 pb-4 flex gap-3">
+          <button 
+            onClick={() => apply7DayFilter('bidding')} 
+            className="flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-100 transition-colors shadow-sm"
+          >
+            <CalendarClock className="h-4 w-4" />
+            Bidding within 7 days: <span className="bg-orange-600 text-white px-2 py-0.5 rounded-full text-xs shadow-inner">{upcomingBids}</span>
+          </button>
+
+          <button 
+            onClick={() => apply7DayFilter('pre_bidding')} 
+            className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors shadow-sm"
+          >
+            <Calendar className="h-4 w-4" />
+            Pre-bidding within 7 days: <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs shadow-inner">{upcomingPreBids}</span>
+          </button>
+        </div>
+
         <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
             <thead className="bg-slate-50 text-slate-700 border-b border-slate-200">
@@ -330,20 +375,20 @@ export default function BiddingPage() {
               ) : biddings.map(b => (
                 <tr key={b.bidding_id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-3 font-medium text-slate-900">{b.is_rfq === 1 ? 'RFQ' : 'ITB'}</td>
-                  <td className="px-4 py-3"><EditableField value={b.category} type="select" options={categoryOptions} onSave={(v) => handleInlineUpdate(b.bidding_id, 'category', v)} /></td>
-                  <td className="px-4 py-3"><EditableField value={b.reference_no} onSave={(v) => handleInlineUpdate(b.bidding_id, 'reference_no', v)} /></td>
+                  <td className="px-4 py-3">{b.category}</td>
+                  <td className="px-4 py-3">{b.reference_no}</td>
                   <td className="px-4 py-3 font-medium text-emerald-600">{formatCurrency(b.approved_budget)}</td>
-                  <td className="px-4 py-3"><EditableField value={b.solicitation_no} onSave={(v) => handleInlineUpdate(b.bidding_id, 'solicitation_no', v)} /></td>
+                  <td className="px-4 py-3">{b.solicitation_no}</td>
                   <td className="px-4 py-3">{b.procuring_entity}</td>
                   <td className="px-4 py-3">{b.island_group_name}</td>
                   <td className="px-4 py-3">{b.region_name}</td>
                   <td className="px-4 py-3 text-xs">{formatDate(b.pre_bid_datetime)}</td>
                   <td className="px-4 py-3 text-xs">{formatDate(b.closing_date_time)}</td>
-                  <td className="px-4 py-3">
-                    <EditableField value={b.itb_status} type="select" options={statusOptions} onSave={(v) => handleInlineUpdate(b.bidding_id, 'itb_status', v)} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => handleDelete(b.bidding_id)} className="text-red-600 hover:text-red-800 p-1"><Trash2 className="h-4 w-4" /></button>
+                  <td className="px-4 py-3">{b.itb_status}</td>
+                  <td className="px-4 py-3 text-right flex items-center justify-end gap-2">
+                    {/* New Edit Link instead of inline editing! */}
+                    <Link href={`/admin/bidding/${b.bidding_id}`} className="text-blue-600 hover:text-blue-800 p-1 bg-blue-50 rounded hover:bg-blue-100"><Edit2 className="h-4 w-4" /></Link>
+                    <button onClick={() => handleDelete(b.bidding_id)} className="text-red-600 hover:text-red-800 p-1 bg-red-50 rounded hover:bg-red-100"><Trash2 className="h-4 w-4" /></button>
                   </td>
                 </tr>
               ))}

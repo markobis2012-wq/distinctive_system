@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/internal/models"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -77,4 +78,14 @@ func HandleDeleteProduct(c *gin.Context) {
 	prodID, _ := strconv.Atoi(c.Param("prod_id"))
 	models.DeleteProduct(prodID)
 	c.JSON(200, gin.H{"message": "Product deleted"})
+}
+
+func HandleGetProjectByID(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	project, err := models.GetProjectByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+	c.JSON(http.StatusOK, project)
 }
