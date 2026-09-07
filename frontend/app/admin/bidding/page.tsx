@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Trash2, Edit2, Check, X, FileSignature, Filter, ArrowUp, ArrowDown, CalendarClock, Calendar } from 'lucide-react';
 import Link from 'next/link';
+import { Sparkles } from 'lucide-react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
 
 // --- Custom Searchable Select Dropdown ---
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select...", onAddNew }: any) => {
@@ -112,7 +115,7 @@ export default function BiddingPage() {
 
   const fetchDictionaries = async () => {
     try {
-      const [compRes, locRes] = await Promise.all([ fetch('http://localhost:8081/api/companies'), fetch('http://localhost:8081/api/locations') ]);
+      const [compRes, locRes] = await Promise.all([ fetch(`${API_URL}/api/companies`), fetch(`${API_URL}/api/locations`) ]);
       if (compRes.ok) setCompanies(await compRes.json());
       if (locRes.ok) setLocations(await locRes.json());
     } catch (err) {}
@@ -128,7 +131,7 @@ export default function BiddingPage() {
         company: String(filters.company), island: String(filters.island), region: String(filters.region), province: String(filters.province), city: String(filters.city),
         preBidStart: filters.preBidStart, preBidEnd: filters.preBidEnd, bidStart: filters.bidStart, bidEnd: filters.bidEnd
       });
-      const res = await fetch(`http://localhost:8081/api/biddings?${queryParams.toString()}`);
+      const res = await fetch(`${API_URL}/api/biddings?${queryParams.toString()}`);
       if (res.ok) {
         const json = await res.json();
         setBiddings(json.data);
@@ -192,7 +195,7 @@ export default function BiddingPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8081/api/biddings', {
+      const res = await fetch(`${API_URL}/api/biddings`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form)
       });
       if (res.ok) { setIsModalOpen(false); fetchBiddings(); }
@@ -203,7 +206,7 @@ export default function BiddingPage() {
     const target = biddings.find(b => b.bidding_id === id);
     if (!target) return;
     try {
-      const res = await fetch(`http://localhost:8081/api/biddings/${id}`, {
+      const res = await fetch(`${API_URL}/api/biddings/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...target, [field]: value })
       });
       if (res.ok) fetchBiddings();
@@ -213,7 +216,7 @@ export default function BiddingPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this bidding record?")) return;
     try {
-      const res = await fetch(`http://localhost:8081/api/biddings/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/api/biddings/${id}`, { method: 'DELETE' });
       if (res.ok) fetchBiddings();
     } catch (err) {}
   };
@@ -241,7 +244,7 @@ export default function BiddingPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:8081${endpoint}`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
@@ -297,6 +300,14 @@ export default function BiddingPage() {
         <button onClick={() => { setForm(defaultForm); setIsModalOpen(true); }} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 shadow-sm">
           <Plus className="h-4 w-4" /> Add Bidding
         </button>
+
+        <Link
+          href="/admin/bidding/ai-search"
+          className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:from-indigo-700 hover:to-violet-700 shadow-sm transition-all"
+        >
+          <Sparkles className="h-4 w-4 text-amber-300" />
+          PhilGEPS AI Scanner
+        </Link>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200">

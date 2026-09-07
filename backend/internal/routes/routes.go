@@ -87,9 +87,57 @@ func SetupRouter() *gin.Engine {
 	r.POST("/api/project-items/components", handlers.HandleAddItemComponent)
 	r.DELETE("/api/project-items/components/:comp_id", handlers.HandleDeleteItemComponent)
 
-	r.POST("/api/login", handlers.HandleLogin)
+	// Attachment Routes
+	r.GET("/api/attachment-types", handlers.HandleGetAttachmentFileTypes)
+	r.GET("/api/projects/:id/attachments", handlers.HandleGetProjectAttachments)
+	r.POST("/api/projects/:id/attachments", handlers.HandleUploadProjectAttachment)
+	r.DELETE("/api/projects/attachments/:attach_id", handlers.HandleDeleteProjectAttachment)
 
-	// (Add your  here once you migrate the auth handler)
+	// Delivery Routes
+	r.GET("/api/deliveries", handlers.HandleGetDeliveries)
+	r.POST("/api/deliveries", handlers.HandleCreateDelivery)
+	r.DELETE("/api/deliveries/:id", handlers.HandleDeleteDelivery)
+
+	// Delivery Item Routes
+	r.GET("/api/deliveries/:id/items", handlers.HandleGetDeliveryItems)
+	r.GET("/api/projects/:id/available-items", handlers.HandleGetAvailableProjectItems)
+	r.POST("/api/deliveries/items", handlers.HandleAddDeliveryItem)
+	r.PUT("/api/deliveries/items/:item_id", handlers.HandleUpdateDeliveryItem)
+	r.DELETE("/api/deliveries/items/:item_id", handlers.HandleDeleteDeliveryItem)
+	r.GET("/api/deliveries/:id", handlers.HandleGetDeliveryByID)
+
+	// Loading List Routes
+	r.GET("/api/loading-lists/:id/items", handlers.HandleGetLoadingListItems)
+	r.POST("/api/loading-lists/items", handlers.HandleAddLoadingListItem)
+	r.DELETE("/api/loading-lists/items/:item_id", handlers.HandleDeleteLoadingListItem)
+
+	// Schedule & Resources Routes
+	r.GET("/api/schedule", handlers.HandleGetSchedule)
+	r.POST("/api/schedule/bookings", handlers.HandleCreateBooking)
+	r.POST("/api/schedule/groups", handlers.HandleCreateGroup)
+	r.DELETE("/api/schedule/bookings/:id", handlers.HandleDeleteBooking)
+
+	r.PUT("/api/schedule/bookings/:id/move", handlers.HandleMoveBooking)
+
+	// Add these with your other routes
+	// r.GET("/api/departments", handlers.GetDepartments)
+	r.GET("/api/staff", handlers.GetStaff)
+	r.POST("/api/staff", handlers.CreateStaff)
+	r.PUT("/api/staff/:id", handlers.UpdateStaff)
+	r.DELETE("/api/staff/:id", handlers.DeleteStaff)
+	r.POST("/api/staff/upload-avatar", handlers.HandleUploadStaffAvatar)
+
+	// Add these for the NEW general attachments page:
+	r.GET("/api/attachments", handlers.HandleGetGeneralAttachments)
+	r.POST("/api/attachments", handlers.HandleCreateGeneralAttachment)
+	r.PUT("/api/attachments/:id", handlers.HandleUpdateGeneralAttachment)
+	r.DELETE("/api/attachments/:id", handlers.HandleDeleteGeneralAttachment)
+	r.POST("/api/attachments/upload", handlers.HandleUploadGeneralFile)
+	r.GET("/api/biddings/ai-search", handlers.HandleAISearchPhilGEPS)
+
+	r.Static("/uploads", "./uploads")
+
+	r.POST("/api/login", handlers.HandleLogin)
 
 	return r
 }

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { User, Lock } from 'lucide-react';
 import Image from 'next/image';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
+
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -18,7 +20,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:8081/api/login', {
+      const res = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),

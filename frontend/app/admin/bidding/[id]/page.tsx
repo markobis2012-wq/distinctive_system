@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, use } from 'react';
 import { Search, Plus, Trash2, Edit2, X, FileSignature, ArrowLeft, Paperclip, FileText, Download } from 'lucide-react';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
+
 // Copy your SearchableSelect component from the previous file here...
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select...", onAddNew }: any) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -57,11 +59,11 @@ export default function EditBiddingPage({ params }: { params: Promise<{ id: stri
     const fetchAll = async () => {
       try {
         const [compRes, locRes, bidRes, attRes, typesRes] = await Promise.all([
-          fetch('http://localhost:8081/api/companies'),
-          fetch('http://localhost:8081/api/locations'),
-          fetch(`http://localhost:8081/api/biddings/${biddingId}`),
-          fetch(`http://localhost:8081/api/biddings/${biddingId}/attachments`),
-          fetch('http://localhost:8081/api/bidding-attachment-types')
+          fetch(`${API_URL}/api/companies`),
+          fetch(`${API_URL}/api/locations`),
+          fetch(`${API_URL}/api/biddings/${biddingId}`),
+          fetch(`${API_URL}/api/biddings/${biddingId}/attachments`),
+          fetch(`${API_URL}/api/bidding-attachment-types`)
         ]);
         if (compRes.ok) setCompanies(await compRes.json());
         if (locRes.ok) setLocations(await locRes.json());
@@ -84,7 +86,7 @@ export default function EditBiddingPage({ params }: { params: Promise<{ id: stri
   const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:8081/api/biddings/${biddingId}`, {
+      const res = await fetch(`${API_URL}/api/biddings/${biddingId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form)
       });
       if (res.ok) alert("Saved successfully!");
@@ -101,10 +103,10 @@ export default function EditBiddingPage({ params }: { params: Promise<{ id: stri
     formData.append("file", attFile);
 
     try {
-      const res = await fetch(`http://localhost:8081/api/biddings/${biddingId}/attachments`, { method: 'POST', body: formData });
+      const res = await fetch(`${API_URL}/api/biddings/${biddingId}/attachments`, { method: 'POST', body: formData });
       if (res.ok) {
         setIsAttModalOpen(false); setAttFile(null); setAttForm({ filename: '', bidding_attachment_file_type_id: 0 });
-        const attRes = await fetch(`http://localhost:8081/api/biddings/${biddingId}/attachments`);
+        const attRes = await fetch(`${API_URL}/api/biddings/${biddingId}/attachments`);
         if (attRes.ok) setAttachments(await attRes.json());
       }
     } catch (err) {}
@@ -113,7 +115,7 @@ export default function EditBiddingPage({ params }: { params: Promise<{ id: stri
   const handleDeleteAttachment = async (attId: number) => {
     if (!confirm("Delete this attachment?")) return;
     try {
-      const res = await fetch(`http://localhost:8081/api/biddings/attachments/${attId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/api/biddings/attachments/${attId}`, { method: 'DELETE' });
       if (res.ok) setAttachments(attachments.filter(a => a.bidding_attachments_id !== attId));
     } catch (err) {}
   };
@@ -237,7 +239,7 @@ export default function EditBiddingPage({ params }: { params: Promise<{ id: stri
                         <td className="px-4 py-3 font-medium text-slate-900">{a.bidding_attachment_file_type}</td>
                         <td className="px-4 py-3">{a.filename}</td>
                         <td className="px-4 py-3 text-right flex justify-end gap-2">
-                          {a.file_path && <a href={`http://localhost:8081${a.file_path}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 p-1"><Download className="h-4 w-4" /></a>}
+                          {a.file_path && <a href={`${API_URL}${a.file_path}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 p-1"><Download className="h-4 w-4" /></a>}
                           <button onClick={() => handleDeleteAttachment(a.bidding_attachments_id)} className="text-red-600 hover:text-red-800 p-1"><Trash2 className="h-4 w-4" /></button>
                         </td>
                       </tr>

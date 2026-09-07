@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
+
 // Editable Field Component
 const EditableField = ({ label, value, onSave }: { label: string; value: string; onSave: (val: string) => void }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -110,7 +112,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
 
   const fetchAttachments = async () => {
     try {
-      const res = await fetch(`http://localhost:8081/api/companies/${companyId}/attachments`);
+      const res = await fetch(`${API_URL}/api/companies/${companyId}/attachments`);
       if (res.ok) setAttachments(await res.json());
     } catch (err) {}
   };
@@ -147,7 +149,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
     Object.entries(attForm).forEach(([key, value]) => formData.append(key, String(value)));
     if (attFile) formData.append('file_path', attFile);
 
-    const url = editingAttId ? `http://localhost:8081/api/companies/${companyId}/attachments/${editingAttId}` : `http://localhost:8081/api/companies/${companyId}/attachments`;
+    const url = editingAttId ? `${API_URL}/api/companies/${companyId}/attachments/${editingAttId}` : `${API_URL}/api/companies/${companyId}/attachments`;
     try {
       const res = await fetch(url, { method: editingAttId ? 'PUT' : 'POST', body: formData });
       if (res.ok) { setIsAttModalOpen(false); fetchAttachments(); }
@@ -157,7 +159,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
   const handleDeleteAtt = async (attId: number) => {
     if (!confirm("Are you sure you want to permanently delete this attachment?")) return;
     try {
-      const res = await fetch(`http://localhost:8081/api/companies/attachments/${attId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/api/companies/attachments/${attId}`, { method: 'DELETE' });
       if (res.ok) fetchAttachments();
     } catch (err) {}
   };
@@ -179,19 +181,19 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
 
   const fetchCompany = async () => {
     try {
-      const res = await fetch(`http://localhost:8081/api/companies/${companyId}`);
+      const res = await fetch(`${API_URL}/api/companies/${companyId}`);
       if (res.ok) setCompany(await res.json());
     } catch (err: any) { setError(err.message); }
   };
   const fetchContactPersons = async () => {
     try {
-      const res = await fetch(`http://localhost:8081/api/companies/${companyId}/contacts`);
+      const res = await fetch(`${API_URL}/api/companies/${companyId}/contacts`);
       if (res.ok) setContactPersons(await res.json());
     } catch (err) {}
   };
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`http://localhost:8081/api/companies/${companyId}/products`);
+      const res = await fetch(`${API_URL}/api/companies/${companyId}/products`);
       if (res.ok) setProducts(await res.json());
     } catch (err) {}
   };
@@ -216,7 +218,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
 
   const handleSaveCp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = editingCpId ? `http://localhost:8081/api/companies/contacts/${editingCpId}` : `http://localhost:8081/api/companies/${companyId}/contacts`;
+    const url = editingCpId ? `${API_URL}/api/companies/contacts/${editingCpId}` : `${API_URL}/api/companies/${companyId}/contacts`;
     try {
       const res = await fetch(url, {
         method: editingCpId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
@@ -230,7 +232,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
     if (cp.is_primary === 1) { alert("You cannot delete the Primary Contact Person."); return; }
     if (!confirm(`Remove ${cp.contact_person_name}?`)) return;
     try {
-      const res = await fetch(`http://localhost:8081/api/companies/contacts/${cp.contact_person_id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/api/companies/contacts/${cp.contact_person_id}`, { method: 'DELETE' });
       if (res.ok) fetchContactPersons();
     } catch (err) {}
   };
@@ -266,7 +268,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
     Object.entries(prodForm).forEach(([key, value]) => formData.append(key, String(value)));
     if (imageFile) formData.append('product_image', imageFile);
 
-    const url = editingProdId ? `http://localhost:8081/api/companies/${companyId}/products/${editingProdId}` : `http://localhost:8081/api/companies/${companyId}/products`;
+    const url = editingProdId ? `${API_URL}/api/companies/${companyId}/products/${editingProdId}` : `${API_URL}/api/companies/${companyId}/products`;
     
     try {
       const res = await fetch(url, {
@@ -280,7 +282,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
   const handleDeleteProd = async (prodId: number) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      const res = await fetch(`http://localhost:8081/api/companies/products/${prodId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/api/companies/products/${prodId}`, { method: 'DELETE' });
       if (res.ok) fetchProducts();
     } catch (err) {}
   };
@@ -447,9 +449,9 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                                 <td className="px-4 py-3">
                                   {p.product_image ? (
                                     <img 
-                                        src={`http://localhost:8081${p.product_image}`} 
+                                        src={`${API_URL}${p.product_image}`} 
                                         alt={p.supplier_product_name} 
-                                        onClick={() => setEnlargedImage(`http://localhost:8081${p.product_image}`)}
+                                        onClick={() => setEnlargedImage(`${API_URL}${p.product_image}`)}
                                         className="h-10 w-10 object-cover rounded shadow-sm border border-slate-200 cursor-zoom-in hover:opacity-80 transition-opacity" 
                                         />
                                   ) : (
@@ -508,7 +510,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                               <tr key={a.comp_attachments_id} className="border-b border-slate-100 hover:bg-slate-50">
                                 <td className="px-4 py-3">
                                   {a.file_path ? (
-                                    <img src={`http://localhost:8081${a.file_path}`} onClick={() => setEnlargedImage(`http://localhost:8081${a.file_path}`)} alt={a.file_name} className="h-10 w-10 object-cover rounded shadow-sm border border-slate-200 cursor-zoom-in hover:opacity-80" />
+                                    <img src={`${API_URL}${a.file_path}`} onClick={() => setEnlargedImage(`${API_URL}${a.file_path}`)} alt={a.file_name} className="h-10 w-10 object-cover rounded shadow-sm border border-slate-200 cursor-zoom-in hover:opacity-80" />
                                   ) : (
                                     <div className="h-10 w-10 bg-slate-100 rounded flex items-center justify-center border border-slate-200"><ImageIcon className="h-4 w-4 text-slate-300" /></div>
                                   )}
@@ -568,7 +570,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                     {previewUrl ? (
                         <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
                     ) : prodForm.product_image ? (
-                        <img src={`http://localhost:8081${prodForm.product_image}`} alt="Current" className="h-full w-full object-cover" />
+                        <img src={`${API_URL}${prodForm.product_image}`} alt="Current" className="h-full w-full object-cover" />
                     ) : (
                         <ImageIcon className="h-5 w-5 text-slate-300" />
                     )}
@@ -631,7 +633,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                     {attPreviewUrl ? (
                       <img src={attPreviewUrl} className="h-full w-full object-cover" />
                     ) : attForm.file_path ? (
-                      <img src={`http://localhost:8081${attForm.file_path}`} className="h-full w-full object-cover" />
+                      <img src={`${API_URL}${attForm.file_path}`} className="h-full w-full object-cover" />
                     ) : (
                       <Paperclip className="h-5 w-5 text-slate-300" />
                     )}

@@ -4,6 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ArrowUpDown, Building2, ChevronDown, ChevronUp, Phone, UserCircle, Plus, Pencil } from 'lucide-react';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
+
 interface Contact {
   type: string;
   details: string;
@@ -50,7 +52,7 @@ export default function DirectoryPage() {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const res = await fetch('http://localhost:8081/api/companies');
+        const res = await fetch(`${API_URL}/api/companies`);
         const data = await res.json();
 
         if (Array.isArray(data)) {

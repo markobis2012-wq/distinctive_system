@@ -36,11 +36,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Directory', icon: Users, active: false, href: '/admin/directory' },
     { name: 'Bidding', icon: Gavel, active: false, href: '/admin/bidding' },
     { name: 'Projects', icon: FolderKanban, active: false, href: '/admin/projects' },
-    { name: 'Delivery', icon: Truck, active: false, href: '#' },
-    { name: 'Site Staff', icon: Users, active: false, href: '#' },
-    { name: 'Schedules', icon: CalendarDays, active: false, href: '#' },
+    { name: 'Delivery', icon: Truck, active: false, href: '/admin/delivery' },
+    { name: 'Site Staff', icon: Users, active: false, href: '/admin/site-staff' },
+    { name: 'Schedules', icon: CalendarDays, active: false, href: '/admin/schedule' },
     { name: 'Admin Controls', icon: Settings, active: false, href: '#' },
-    { name: 'Attachments', icon: Paperclip, active: false, href: '#' },
+    { name: 'Attachments', icon: Paperclip, active: false, href: '/admin/attachments' },
     { name: 'User Maintenance', icon: ShieldCheck, active: false, href: '#' },
   ];
 
