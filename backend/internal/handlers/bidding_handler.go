@@ -83,12 +83,14 @@ func HandleUpdateBidding(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
+
 	req.BiddingID = id
 	req.LastUpdateTime = formatDateTime(req.LastUpdateTime)
 	req.ClosingDateTime = formatDateTime(req.ClosingDateTime)
 	req.PreBidDatetime = formatDateTime(req.PreBidDatetime)
 
-	if err := models.UpdateBidding(req); err != nil {
+	// FIX: Pass both the 'id' and 'req' to match the updated model!
+	if err := models.UpdateBidding(id, req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update bidding"})
 		return
 	}

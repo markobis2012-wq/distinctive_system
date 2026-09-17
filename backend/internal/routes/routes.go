@@ -13,7 +13,7 @@ func SetupRouter() *gin.Engine {
 	// Setup CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"POST", "GET", "OPTIONS", "PUT", "DELETE"}, // <-- Added PUT and DELETE
+		AllowMethods:     []string{"POST", "GET", "OPTIONS", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
@@ -116,18 +116,17 @@ func SetupRouter() *gin.Engine {
 	r.POST("/api/schedule/bookings", handlers.HandleCreateBooking)
 	r.POST("/api/schedule/groups", handlers.HandleCreateGroup)
 	r.DELETE("/api/schedule/bookings/:id", handlers.HandleDeleteBooking)
-
 	r.PUT("/api/schedule/bookings/:id/move", handlers.HandleMoveBooking)
+	r.GET("/api/schedule/bookings/:id/details", handlers.HandleGetBookingDetails) // <-- NEW FSM ROUTE
 
 	// Add these with your other routes
-	// r.GET("/api/departments", handlers.GetDepartments)
 	r.GET("/api/staff", handlers.GetStaff)
 	r.POST("/api/staff", handlers.CreateStaff)
 	r.PUT("/api/staff/:id", handlers.UpdateStaff)
 	r.DELETE("/api/staff/:id", handlers.DeleteStaff)
 	r.POST("/api/staff/upload-avatar", handlers.HandleUploadStaffAvatar)
 
-	// Add these for the NEW general attachments page:
+	// General attachments page:
 	r.GET("/api/attachments", handlers.HandleGetGeneralAttachments)
 	r.POST("/api/attachments", handlers.HandleCreateGeneralAttachment)
 	r.PUT("/api/attachments/:id", handlers.HandleUpdateGeneralAttachment)
@@ -135,8 +134,50 @@ func SetupRouter() *gin.Engine {
 	r.POST("/api/attachments/upload", handlers.HandleUploadGeneralFile)
 	r.GET("/api/biddings/ai-search", handlers.HandleAISearchPhilGEPS)
 
-	r.Static("/uploads", "./uploads")
+	// Inventory Routes
+	r.GET("/api/inventory", handlers.GetInventory)
+	r.POST("/api/inventory", handlers.CreateInventoryItem)
+	r.PUT("/api/inventory/:id", handlers.UpdateInventoryItem)
+	r.POST("/api/inventory/:id/add-stock", handlers.AddStock)
+	r.GET("/api/inventory/:id/history", handlers.GetStockHistory)
+	r.PUT("/api/inventory/history/:added_id", handlers.UpdateAddedStock)
+	r.POST("/api/inventory/return", handlers.ReturnToStock)
 
+	// MRF Warehouse Routes
+	r.GET("/api/warehouse/mrfs/pending", handlers.GetPendingMRFs)
+	r.GET("/api/warehouse/mrfs/:id/items", handlers.GetMRFItemsForFulfillment)
+	r.POST("/api/warehouse/mrfs/fulfill", handlers.FulfillMRF)
+
+	r.GET("/api/projects/:id/mrfs", handlers.GetProjectMRFs)
+	r.POST("/api/projects/:id/mrfs", handlers.CreateProjectMRF)
+
+	r.GET("/api/warehouse/mrfs/history", handlers.GetMRFHistory)
+	r.GET("/api/projects/:id/components", handlers.HandleGetAllProjectComponents)
+
+	// Canvassing & RFQ Routes
+	r.GET("/api/canvass/items", handlers.HandleGetItemsForCanvassing)
+	r.GET("/api/canvass/component/:component_id/quotes", handlers.HandleGetQuotations)
+	r.POST("/api/canvass/quotes", handlers.HandleAddQuotation)
+	r.POST("/api/canvass/award", handlers.HandleAwardQuotation)
+	r.PUT("/api/canvass/quotes/:canvass_id", handlers.HandleUpdateQuotation)
+	r.POST("/api/canvass/quotes/bulk", handlers.HandleAddBulkQuotations)
+	r.GET("/api/po/awarded-items", handlers.HandleGetAwardedComponents)
+	r.POST("/api/po/generate", handlers.HandleGeneratePO)
+	r.POST("/api/canvass/cancel-award", handlers.HandleCancelAward)
+	r.PUT("/api/schedule/bookings/:id", handlers.HandleUpdateBooking)
+
+	r.GET("/api/production/pipeline", handlers.HandleGetProductionPipeline)
+	r.PUT("/api/production/items/:id/advance", handlers.HandleAdvanceProduction)
+
+	r.POST("/api/delivery/generate-from-booking/:id", handlers.HandleGenerateDeliveryFromBooking)
+
+	r.PUT("/api/deliveries/:id/status", handlers.HandleUpdateDeliveryStatus)
+
+	r.GET("/api/deliveries/:id/client-report", handlers.HandleGetClientHandoverReport)
+
+	r.POST("/api/deliveries/:id/complete", handlers.HandleCompleteDelivery)
+
+	r.Static("/uploads", "./uploads")
 	r.POST("/api/login", handlers.HandleLogin)
 
 	return r

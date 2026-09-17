@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Menu, Bell, Search, LayoutDashboard, Gavel, FolderKanban, 
   Truck, Users, CalendarDays, Settings, Paperclip, ShieldCheck, 
-  LogOut
+  LogOut, Package, ShoppingCart, Factory // <-- 1. ADDED Factory icon here
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -36,6 +36,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Directory', icon: Users, active: false, href: '/admin/directory' },
     { name: 'Bidding', icon: Gavel, active: false, href: '/admin/bidding' },
     { name: 'Projects', icon: FolderKanban, active: false, href: '/admin/projects' },
+    { name: 'Production', icon: Factory, active: false, href: '/admin/production' }, // <-- 2. ADDED Production link here
+    { name: 'Inventory', icon: Package, active: false, href: '/admin/inventory' },
+    { name: 'Purchasing', icon: ShoppingCart, active: false, href: '/admin/purchasing' },
     { name: 'Delivery', icon: Truck, active: false, href: '/admin/delivery' },
     { name: 'Site Staff', icon: Users, active: false, href: '/admin/site-staff' },
     { name: 'Schedules', icon: CalendarDays, active: false, href: '/admin/schedule' },

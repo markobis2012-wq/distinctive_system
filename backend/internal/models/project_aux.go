@@ -29,12 +29,17 @@ func GetDepartments() ([]Department, error) {
 }
 
 func GetProjectCategories() ([]ProjectCategory, error) {
+	// FIX 1: Added the "tbl_" prefix to the table name
 	rows, err := config.DB.Query("SELECT projects_category_id, category FROM tbl_projects_category")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []ProjectCategory
+
+	// FIX 2: Initialize as an empty slice. This ensures that even if the table is empty,
+	// it sends '[]' to the frontend instead of 'null', preventing map() crashes!
+	list := []ProjectCategory{}
+
 	for rows.Next() {
 		var item ProjectCategory
 		if err := rows.Scan(&item.ID, &item.Category); err == nil {

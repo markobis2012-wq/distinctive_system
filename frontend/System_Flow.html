@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enterprise ERP System Features & Workflow Specification</title>
+    <style>
+        :root {
+            --primary: #0f172a; /* Slate 900 */
+            --secondary: #2563eb; /* Blue 600 */
+            --accent: #059669; /* Emerald 600 */
+            --warning: #ea580c; /* Orange 600 */
+            --bg: #f8fafc;
+            --text: #334155;
+            --light-border: #e2e8f0;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+        }
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+        .header {
+            border-bottom: 4px solid var(--secondary);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+        .header p {
+            color: var(--secondary);
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin: 8px 0 0 0;
+            letter-spacing: 0.5px;
+        }
+        .intro {
+            font-size: 1.05rem;
+            margin-bottom: 40px;
+            background: var(--bg);
+            padding: 20px;
+            border-left: 4px solid var(--secondary);
+            border-radius: 0 8px 8px 0;
+        }
+        .phase-card {
+            border: 1px solid var(--light-border);
+            border-radius: 12px;
+            padding: 25px 30px;
+            margin-bottom: 30px;
+            background: #fff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            page-break-inside: avoid;
+        }
+        .phase-header {
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid var(--light-border);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .phase-number {
+            background: var(--secondary);
+            color: white;
+            font-weight: 900;
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 18px;
+            font-size: 1.3rem;
+        }
+        .phase-title {
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 0;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        .feature-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px 20px;
+        }
+        .feature-item h4 {
+            color: var(--secondary);
+            margin: 0 0 8px 0;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .feature-item p {
+            margin: 0;
+            font-size: 0.92rem;
+            color: #475569;
+        }
+        .tech-detail {
+            background: #f1f5f9;
+            border-left: 3px solid var(--primary);
+            padding: 10px 15px;
+            margin-top: 10px;
+            font-size: 0.88rem;
+            color: #334155;
+            border-radius: 0 6px 6px 0;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            border-top: 1px solid var(--light-border);
+            padding-top: 20px;
+        }
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .container { padding: 0; }
+            .phase-card { box-shadow: none; border: 1.5px solid #cbd5e1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Enterprise ERP System Features</h1>
+            <p>System-Driven Workflow Architecture Specification</p>
+        </div>
+
+        <div class="intro">
+            <b>System Overview:</b> This document details the exact automated software features and transactional capabilities embedded within the platform. Every phase highlights how the system natively processes data, executes relational database logic, and automates cross-module integration from initial quotation to final inventory deduction.
+        </div>
+
+        <!-- PHASE 1 -->
+        <div class="phase-card">
+            <div class="phase-header">
+                <div class="phase-number">1</div>
+                <h2 class="phase-title">Bidding & Quotation Module</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>🧩 Interactive Bid Builder & Catalog Integration</h4>
+                    <p>The system provides a dynamic quotation interface pulling assembled parent products from a master catalog or defining custom items with integrated margin and cost calculators.</p>
+                    <div class="tech-detail"><b>System Action:</b> Persists records into <code>tbl_bids</code> without modifying inventory balances.</div>
+                </div>
+                <div class="feature-item">
+                    <h4>📄 Automated Document Generation</h4>
+                    <p>The system instantly formats and compiles quotation data into professional, branded PDF documents ready for transmission.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHASE 2 -->
+        <div class="phase-card">
+            <div class="phase-header">
+                <div class="phase-number">2</div>
+                <h2 class="phase-title">Project Conversion & MRF Module</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>⚡ Automated Project Awarding Engine</h4>
+                    <p>Upon status toggling, the system automatically instantiates a new Project record (e.g., <code>2026-001</code>), transfers quotation items into official project tracking tables, and locks the source bid to preserve financial auditing histories.</p>
+                </div>
+                <div class="feature-item">
+                    <h4>📋 Bill of Materials (BOM) to Material Requisition Form (MRF) Exploder</h4>
+                    <p>The system reads parent product structures and automatically explodes them into required raw material sub-components, generating an itemized MRF tracking system.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHASE 3 -->
+        <div class="phase-card">
+            <div class="phase-header">
+                <div class="phase-number">3</div>
+                <h2 class="phase-title">Inventory Checking & Procurement Module</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>📦 Automated Inventory Reconciliation & Allocation</h4>
+                    <p>The system evaluates approved MRF requirements against master stock. It isolates available inventory by shifting quantities into a reserved state (reducing <code>qty_available</code> while keeping <code>qty_on_hand</code> intact) and dynamically flags shortages.</p>
+                </div>
+                <div class="feature-item">
+                    <h4>📊 Canvassing & Purchase Order (PO) Engine</h4>
+                    <p>The system automatically compiles shortaged components into a Procurement Board, aggregates supplier pricing matrixes, highlights optimal costs, and generates formal Purchase Orders linked directly to the target Project ID.</p>
+                </div>
+                <div class="feature-item">
+                    <h4>📥 Goods Receipt Note (GRN) & Stock Inflow</h4>
+                    <p>Receiving modules process incoming POs, executing automated database transactions that increment master inventory counts while flagging project-specific material arrivals.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHASE 4 -->
+        <div class="phase-card">
+            <div class="phase-header">
+                <div class="phase-number">4</div>
+                <h2 class="phase-title">Production & Return to Stock (RTS) Module</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>🏭 Production Staging & Pipeline Board</h4>
+                    <p>Tracks assembly lifecycles through distinct states (<i>In Production</i> to <i>Ready for Delivery</i>) via an interactive accordion matrix computing real-time aggregate percentage completion bars.</p>
+                </div>
+                <div class="feature-item">
+                    <h4>🔄 Return to Stock (RTS) & Ledger Audit Engine</h4>
+                    <p>Provides modal interfaces for returning excess factory materials back to warehouse inventory with decimal-precision quantities and operational notes.</p>
+                    <div class="tech-detail"><b>System Action:</b> Executes an ACID transaction updating master inventory <code>qty_on_hand</code> while automatically inserting a traceable audit entry into <code>tbl_inventory_added</code> with Supplier ID 0.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHASE 5 -->
+        <div class="phase-card">
+            <div class="phase-header">
+                <div class="phase-number">5</div>
+                <h2 class="phase-title">FSM Dispatch & Unified Logistics Bridge</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>📅 Field Service Management (FSM) Calendar Scheduling</h4>
+                    <p>Enables dispatchers to schedule trucks, assign crews, select time windows, and link staged inventory items directly to formal Job Orders (JO).</p>
+                </div>
+                <div class="feature-item">
+                    <h4>🌉 The Single-Row Data Bridge</h4>
+                    <p>Transforms scheduling data into shipping records instantly via a backend bridge action.</p>
+                    <div class="tech-detail"><b>System Action:</b> Creates a single master delivery record in <code>tbl_delivery</code>, mapping items simultaneously to child component records and parent product matrices to eliminate data drift.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHASE 6 -->
+        <div class="phase-card">
+            <div class="phase-header">
+                <div class="phase-number">6</div>
+                <h2 class="phase-title">Warehouse Printing & Document Engine</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>📋 Internal Loading List (Pick List) Generator</h4>
+                    <p>Renders an optimized internal layout featuring sub-component explosions, item images, and physical square checkboxes designed explicitly for warehouse forklift pick-lists.</p>
+                </div>
+                <div class="feature-item">
+                    <h4>📄 External Delivery Receipt (DR) Generator</h4>
+                    <p>Renders corporate multi-page templates (supporting A3, Inkjet, and Dot-Matrix hardware profiles) rolling components back up into parent products with formal legal signature blocks.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHASE 7 -->
+        <div class="phase-card">
+            <div class="phase-header">
+                <div class="phase-number">7</div>
+                <h2 class="phase-title">Accomplishment Reporting & Inventory Deduction Module</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>📸 Digital Accomplishment Portal & Proof of Delivery</h4>
+                    <p>Accepts multipart form uploads for signed physical delivery receipt photos, processes crew text notes/exceptions, and appends logs into project accomplishment history fields.</p>
+                </div>
+                <div class="feature-item">
+                    <h4>📉 Automated Inventory Subtraction & Status Closure Engine</h4>
+                    <p>Closes the project delivery feedback loop completely via automated relational math.</p>
+                    <div class="tech-detail"><b>System Action:</b> Shifts Job Order statuses to <i>Completed</i> and executes a backend SQL transaction utilizing <code>MIN()</code> grouping logic over delivery items to calculate assembled parent totals, decrementing staging counts (<code>qty_ready_for_delivery</code>) and incrementing completed metrics (<code>qty_delivered</code>) instantly across project dashboards.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Enterprise System Specification &bull; Automated Architecture Documentation
+        </div>
+    </div>
+</body>
+</html>

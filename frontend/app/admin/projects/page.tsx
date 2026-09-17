@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation'; // <-- ADDED ROUTER
 import { Search, Plus, Trash2, Edit2, Check, X, FolderKanban, Filter, ArrowUp, ArrowDown } from 'lucide-react';
 import Link from 'next/link';
 
@@ -45,6 +46,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Select...",
 };
 
 export default function ProjectsPage() {
+  const router = useRouter(); // <-- INITIALIZE ROUTER
   const [projects, setProjects] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [biddings, setBiddings] = useState<any[]>([]);
@@ -145,11 +147,11 @@ export default function ProjectsPage() {
     </th>
   );
 
-  const statusOptions = ["Today", "Under Evaluation", "Awarded", "Failed",  "On-going", "Completed"];
-  const companyOptions = companies.map(c => ({ value: c.company_id, label: c.company_name }));
-  const biddingOptions = biddings.map(b => ({ value: b.bidding_id, label: `${b.reference_no} - ${b.title || 'No Title'}` }));
-  const departmentOptions = departments.map(d => ({ value: d.department_id, label: d.department }));
-  const categoryOptions = categories.map(c => ({ value: c.category, label: c.category })); // Saving category string, not ID
+  const statusOptions = ["Today", "Under Evaluation", "Awarded", "Failed",  "On-going", "Completed", "New"];
+  const companyOptions = (companies || []).map(c => ({ value: c.company_id, label: c.company_name }));
+  const biddingOptions = (biddings || []).map(b => ({ value: b.bidding_id, label: `${b.reference_no} - ${b.title || 'No Title'}` }));
+  const departmentOptions = (departments || []).map(d => ({ value: d.department_id, label: d.department }));
+  const categoryOptions = (categories || []).map(c => ({ value: c.category, label: c.category })); // Saving category string, not ID
 
   return (
     <div className="bg-slate-50 min-h-screen p-8">
@@ -198,7 +200,11 @@ export default function ProjectsPage() {
             </thead>
             <tbody>
               {projects.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400">No records found.</td></tr> : projects.map(p => (
-                <tr key={p.projects_id} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr 
+                  key={p.projects_id} 
+                  onClick={() => router.push(`/admin/projects/${p.projects_id}`)}
+                  className="border-b border-slate-100 hover:bg-slate-100 cursor-pointer transition-colors"
+                >
                   <td className="px-4 py-3 font-bold text-slate-900">{p.project_number}</td>
                   <td className="px-4 py-3">{p.project_name}</td>
                   <td className="px-4 py-3">{p.client_name}</td>
@@ -207,20 +213,16 @@ export default function ProjectsPage() {
                   <td className="px-4 py-3 font-medium text-emerald-600">{formatCurrency(p.contract_amount)}</td>
                   <td className="px-4 py-3">{p.project_date_start_date}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${p.project_status === 'Finished' ? 'bg-emerald-100 text-emerald-700' : p.project_status === 'On-going' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${p.project_status === 'Finished' ? 'bg-emerald-100 text-emerald-700' : p.project_status === 'On-going' ? 'bg-blue-100 text-blue-700' : p.project_status === 'New' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
                       {p.project_status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right flex justify-end gap-2">
-                    <Link
-                        href={`/admin/projects/${p.projects_id}`}
-                        className="text-blue-600 hover:text-blue-800 p-1 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
-                    >
-                        <Edit2 className="h-4 w-4" />
-                    </Link>
+                    {/* Only keeping Delete Button, with stopPropagation to prevent row click */}
                     <button
-                        onClick={() => handleDelete(p.projects_id)}
-                        className="text-red-600 hover:text-red-800 p-1 bg-red-50 rounded hover:bg-red-100 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(p.projects_id); }}
+                        className="text-red-600 hover:text-red-800 p-1.5 bg-red-50 rounded hover:bg-red-100 transition-colors"
+                        title="Delete Project"
                     >
                         <Trash2 className="h-4 w-4" />
                     </button>

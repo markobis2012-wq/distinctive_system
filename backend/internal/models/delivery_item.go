@@ -24,15 +24,34 @@ type AvailableProjectItem struct {
 }
 
 // Fetches items currently inside a specific Delivery Receipt
-func GetDeliveryItems(deliveryID int) ([]DeliveryItem, error) {
+// Replace your old GetDeliveryItems with this unified master query!
+func GetDeliveryItems(deliveryID int) ([]LoadingListItem, error) {
 	query := `
-		SELECT a.delivery_item_id, a.delivery_id, a.project_item_id, a.deliver_qty, COALESCE(a.remarks, ''),
-		       b.product_name, COALESCE(c.uom_abbr, '')
+		SELECT 
+			a.delivery_item_id, a.delivery_id, COALESCE(a.project_item_id, 0), COALESCE(a.project_item_component_id, 0), COALESCE(a.deliver_qty, 0),
+			
+			-- Parent Info
+			COALESCE(d.product_name, ''), COALESCE(d.dbos_image_path, ''), COALESCE(d.product_description, ''),
+			
+			-- Component Info (Injecting inventory_name to fallback nicely)
+			COALESCE(inv.inventory_name, e.supplier_product_name, ''), 
+			COALESCE(inv.description, e.prod_description, ''), 
+			COALESCE(inv.image_path, e.product_image, ''),
+			COALESCE(f.uom_abbr, ''),
+
+			-- UI Name & Image
+			COALESCE(inv.inventory_name, e.supplier_product_name, d.product_name, a.remarks, 'Unknown Item'),
+			COALESCE(a.deliver_qty, 0),
+			COALESCE(inv.image_path, e.product_image, d.dbos_image_path, d.image_path, '')
+
 		FROM tbl_delivery_item a
-		LEFT JOIN tbl_project_items b ON b.project_items_id = a.project_item_id
-		LEFT JOIN tbl_uom c ON c.uom_id = b.uom
+		LEFT JOIN tbl_project_item_component c ON c.project_item_component_id = a.project_item_component_id
+		LEFT JOIN tbl_project_items d ON d.project_items_id = a.project_item_id
+		LEFT JOIN tbl_supplier_products e ON e.supplier_product_id = c.supplier_product_id
+		LEFT JOIN tbl_inventory inv ON inv.inventory_id = c.inventory_id
+		LEFT JOIN tbl_uom f ON f.uom_id = d.uom
 		WHERE a.delivery_id = ?
-		ORDER BY a.delivery_item_id DESC`
+		ORDER BY a.delivery_item_id ASC`
 
 	rows, err := config.DB.Query(query, deliveryID)
 	if err != nil {
@@ -40,15 +59,18 @@ func GetDeliveryItems(deliveryID int) ([]DeliveryItem, error) {
 	}
 	defer rows.Close()
 
-	var items []DeliveryItem
+	var items []LoadingListItem
 	for rows.Next() {
-		var i DeliveryItem
-		if err := rows.Scan(&i.DeliveryItemID, &i.DeliveryID, &i.ProjectItemID, &i.DeliverQty, &i.Remarks, &i.ProductName, &i.UOMAbbr); err == nil {
-			items = append(items, i)
-		}
+		var i LoadingListItem
+		rows.Scan(
+			&i.LoadingListID, &i.DeliveryID, &i.ProjectItemID, &i.ProjectItemComponentID, &i.ItemQty,
+			&i.ProductName, &i.ItemImage, &i.ItemDesc, &i.ComponentName, &i.ComponentDesc, &i.ComponentImage, &i.UOMAbbr,
+			&i.ItemName, &i.Qty, &i.ImagePath,
+		)
+		items = append(items, i)
 	}
 	if items == nil {
-		items = []DeliveryItem{}
+		items = []LoadingListItem{}
 	}
 	return items, nil
 }

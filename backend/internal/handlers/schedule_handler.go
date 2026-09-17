@@ -36,6 +36,19 @@ func HandleCreateBooking(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Booking created"})
 }
 
+func HandleGetBookingDetails(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	items, crew, err := models.GetBookingDetails(id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{
+		"items": items,
+		"crew":  crew,
+	})
+}
+
 func HandleCreateGroup(c *gin.Context) {
 	var req models.GroupPayload
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -69,4 +82,19 @@ func HandleMoveBooking(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"message": "Booking moved successfully"})
+}
+
+func HandleUpdateBooking(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var req models.ScheduleBooking
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid payload"})
+		return
+	}
+	req.BookingID = id
+	if err := models.UpdateBooking(req); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "Booking updated"})
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation'; // <-- ADDED ROUTER
 import { Search, Plus, Trash2, Edit2, Check, X, FileSignature, Filter, ArrowUp, ArrowDown, CalendarClock, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
@@ -82,6 +83,7 @@ const EditableField = ({ value, type = "text", options = [], onSave }: { value: 
 };
 
 export default function BiddingPage() {
+  const router = useRouter(); // <-- INITIALIZE ROUTER
   const [biddings, setBiddings] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [locations, setLocations] = useState<any>({ islands: [], regions: [], provinces: [], cities: [] });
@@ -279,7 +281,7 @@ export default function BiddingPage() {
   const classificationOptions = ["Goods", "Services"];
 
   // Filter Options
-  const companyOptions = companies.map(c => ({ value: c.company_id, label: c.company_name }));
+  const companyOptions = (companies || []).map(c => ({ value: c.company_id, label: c.company_name }));
   const islandOptions = locations.islands?.map((i: any) => ({ value: i.id, label: i.name })) || [];
   const filterRegionOptions = locations.regions?.filter((r: any) => filters.island ? r.island_group_id === filters.island : true).map((r: any) => ({ value: r.id, label: r.name })) || [];
   const filterProvinceOptions = locations.provinces?.filter((p: any) => filters.region ? p.region_id === filters.region : true).map((p: any) => ({ value: p.id, label: p.name })) || [];
@@ -384,7 +386,11 @@ export default function BiddingPage() {
               {biddings.length === 0 ? (
                 <tr><td colSpan={12} className="px-4 py-8 text-center text-slate-400">No records found. Try clearing your filters.</td></tr>
               ) : biddings.map(b => (
-                <tr key={b.bidding_id} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr 
+                  key={b.bidding_id} 
+                  onClick={() => router.push(`/admin/bidding/${b.bidding_id}`)}
+                  className="border-b border-slate-100 hover:bg-slate-100 cursor-pointer transition-colors"
+                >
                   <td className="px-4 py-3 font-medium text-slate-900">{b.is_rfq === 1 ? 'RFQ' : 'ITB'}</td>
                   <td className="px-4 py-3">{b.category}</td>
                   <td className="px-4 py-3">{b.reference_no}</td>
@@ -396,10 +402,14 @@ export default function BiddingPage() {
                   <td className="px-4 py-3 text-xs">{formatDate(b.pre_bid_datetime)}</td>
                   <td className="px-4 py-3 text-xs">{formatDate(b.closing_date_time)}</td>
                   <td className="px-4 py-3">{b.itb_status}</td>
-                  <td className="px-4 py-3 text-right flex items-center justify-end gap-2">
-                    {/* New Edit Link instead of inline editing! */}
-                    <Link href={`/admin/bidding/${b.bidding_id}`} className="text-blue-600 hover:text-blue-800 p-1 bg-blue-50 rounded hover:bg-blue-100"><Edit2 className="h-4 w-4" /></Link>
-                    <button onClick={() => handleDelete(b.bidding_id)} className="text-red-600 hover:text-red-800 p-1 bg-red-50 rounded hover:bg-red-100"><Trash2 className="h-4 w-4" /></button>
+                  <td className="px-4 py-3 text-right">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDelete(b.bidding_id); }} 
+                      className="text-red-600 hover:text-red-800 p-1.5 bg-red-50 rounded hover:bg-red-100 transition-colors"
+                      title="Delete Record"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </td>
                 </tr>
               ))}

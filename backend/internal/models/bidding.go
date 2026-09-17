@@ -270,25 +270,70 @@ func AddBidding(b Bidding) error {
 	return err
 }
 
-func UpdateBidding(b Bidding) error {
-	query := `
-		UPDATE tbl_bidding SET
-			reference_no=?, solicitation_no=?, procuring_entity=?, client_id=?, title=?, full_address=?,
-			island_group_id=?, region_id=?, province_id=?, city_id=?, trade_agreement=?, procurement_mode=?, classification=?, category=?,
-			contact_numbers=?, approved_budget=?, delivery_period=?, date_published=NULLIF(?, ''), last_update_time=NULLIF(?, ''), closing_date_time=NULLIF(?, ''),
-			contact_person=?, contact_person_dept=?, contact_number=?, email=?, alternate_cont_person=?, alternate_cont_dept=?, alt_cont_contacts=?, alt_cont_email=?,
-			pre_bid_datetime=NULLIF(?, ''), venue=?, itb_status=?, must_join=?, is_rfq=?, note_desc=?
-		WHERE bidding_id=?`
+// Example Update function inside your Go backend (models/bidding.go)
+func UpdateBidding(id int, b Bidding) error {
+	tx, err := config.DB.Begin()
+	if err != nil {
+		return err
+	}
 
-	_, err := config.DB.Exec(query,
-		b.ReferenceNo, b.SolicitationNo, b.ProcuringEntity, b.ClientID, b.Title, b.FullAddress,
-		b.IslandGroupID, b.RegionID, b.ProvinceID, b.CityID, b.TradeAgreement, b.ProcurementMode, b.Classification, b.Category,
-		b.ContactNumbers, b.ApprovedBudget, b.DeliveryPeriod, b.DatePublished, b.LastUpdateTime, b.ClosingDateTime,
-		b.ContactPerson, b.ContactPersonDept, b.ContactNumber, b.Email, b.AlternateContPerson, b.AlternateContDept, b.AltContContacts, b.AltContEmail,
-		b.PreBidDatetime, b.Venue, b.ItbStatus, b.MustJoin, b.IsRfq, b.NoteDesc,
-		b.BiddingID,
-	)
-	return err
+	// 1. Update the Bidding record
+	// FIX 1: Changed tbl_biddings to tbl_bidding
+	// FIX 2: Wrapped date fields in NULLIF(?, '') to prevent MySQL empty date crashes
+	query := `
+		UPDATE tbl_bidding SET 
+			is_rfq=?, must_join=?, reference_no=?, solicitation_no=?, procuring_entity=?, client_id=?, 
+			title=?, full_address=?, island_group_id=?, region_id=?, province_id=?, city_id=?, 
+			trade_agreement=?, procurement_mode=?, classification=?, category=?, contact_numbers=?, 
+			approved_budget=?, delivery_period=?, date_published=NULLIF(?, ''), last_update_time=NULLIF(?, ''), 
+			closing_date_time=NULLIF(?, ''), contact_person=?, contact_person_dept=?, contact_number=?, 
+			email=?, alternate_cont_person=?, alternate_cont_dept=?, alt_cont_contacts=?, 
+			alt_cont_email=?, pre_bid_datetime=NULLIF(?, ''), venue=?, itb_status=?, note_desc=?
+		WHERE bidding_id=?
+	`
+
+	// FIX 3: Changed b.IsRFQ to b.IsRfq to match your struct exactly
+	_, err = tx.Exec(query,
+		b.IsRfq, b.MustJoin, b.ReferenceNo, b.SolicitationNo, b.ProcuringEntity, b.ClientID,
+		b.Title, b.FullAddress, b.IslandGroupID, b.RegionID, b.ProvinceID, b.CityID,
+		b.TradeAgreement, b.ProcurementMode, b.Classification, b.Category, b.ContactNumbers,
+		b.ApprovedBudget, b.DeliveryPeriod, b.DatePublished, b.LastUpdateTime,
+		b.ClosingDateTime, b.ContactPerson, b.ContactPersonDept, b.ContactNumber,
+		b.Email, b.AlternateContPerson, b.AlternateContDept, b.AltContContacts,
+		b.AltContEmail, b.PreBidDatetime, b.Venue, b.ItbStatus, b.NoteDesc,
+		id)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// ------------------------------------------------------------------------
+	// 2. THE AUTOMATION: If Awarded, automatically create a Project!
+	// ------------------------------------------------------------------------
+	if b.ItbStatus == "Awarded" {
+		// Check if a project already exists for this bidding to avoid duplicates
+		var existingProjectID int
+		err := tx.QueryRow(`SELECT projects_id FROM tbl_projects WHERE bidding_id = ?`, id).Scan(&existingProjectID)
+
+		// If no project is found, create one!
+		if err != nil {
+			projectQuery := `
+				INSERT INTO tbl_projects 
+				(project_name, client_id, bidding_id, contract_amount, project_status, projects_category, dbos_department_id) 
+				VALUES (?, ?, ?, ?, 'New', ?, 1)
+			`
+			// We pass the Bidding Title as the Project Name, and port over the Client, Budget, and Category
+			_, projErr := tx.Exec(projectQuery, b.Title, b.ClientID, id, b.ApprovedBudget, b.Category)
+
+			if projErr != nil {
+				tx.Rollback()
+				return projErr
+			}
+		}
+	}
+
+	return tx.Commit()
 }
 
 func DeleteBidding(id int) error {
