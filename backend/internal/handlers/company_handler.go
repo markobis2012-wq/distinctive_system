@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"backend/internal/models"
-	"net/http"
-
+	"log"      // <-- Add this
+	"net/http" // <-- Add this
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -116,4 +116,32 @@ func HandleDeleteContactPerson(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Contact deleted successfully"})
+}
+
+// In handlers/company.go (or wherever HandleUpdateCompany is)
+func HandleUpdateCompany(c *gin.Context) {
+	idParam := c.Param("id")
+	companyID, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid company ID"})
+		return
+	}
+
+	var req models.CompanyUpdate
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input format: " + err.Error()})
+		return
+	}
+
+	// Call the model function to update the database
+	if err := models.UpdateCompany(companyID, req); err != nil {
+		// THIS LOG WILL SHOW IN YOUR GO TERMINAL
+		log.Printf("==> [DB ERROR] Failed to update company %d: %v\n", companyID, err)
+
+		// THIS WILL SEND THE ERROR TO YOUR BROWSER NETWORK TAB
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Company updated successfully"})
 }

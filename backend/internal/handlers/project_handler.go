@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"backend/internal/models"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -75,4 +76,20 @@ func HandleGetDepartments(c *gin.Context) {
 func HandleGetProjectCategories(c *gin.Context) {
 	list, _ := models.GetProjectCategories()
 	c.JSON(200, list)
+}
+
+// NEW: Get Project By ID
+func HandleGetProjectByID(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID format"})
+		return
+	}
+
+	project, err := models.GetProjectByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+	c.JSON(http.StatusOK, project)
 }

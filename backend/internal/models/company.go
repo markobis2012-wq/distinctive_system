@@ -3,6 +3,7 @@ package models
 import (
 	"backend/internal/config"
 	"database/sql"
+	"strconv"
 )
 
 type Contact struct {
@@ -321,5 +322,55 @@ func UpdateContactPerson(cp CompanyContactPerson) error {
 // Soft delete a contact person by setting is_active = 0
 func DeleteContactPerson(contactPersonID int) error {
 	_, err := config.DB.Exec("UPDATE tbl_company_contact_person SET is_active = 0 WHERE contact_person_id = ?", contactPersonID)
+	return err
+}
+
+// In models/company.go
+
+type CompanyUpdate struct {
+	CompanyName string `json:"company_name"`
+	CompanyType string `json:"company_type"`
+	WebsiteURL  string `json:"website_url"`
+	FullAddress string `json:"full_address"`
+	Zipcode     any    `json:"zipcode"` // Use 'any' so we can handle both string and int from JSON
+}
+
+func UpdateCompany(companyID int, req CompanyUpdate) error {
+	// 1. Safely parse the Zipcode to an Integer (since your DB requires INT)
+	var zipInt int
+	switch v := req.Zipcode.(type) {
+	case float64:
+		zipInt = int(v) // Go parses JSON numbers as float64 by default
+	case string:
+		zipInt, _ = strconv.Atoi(v)
+	case int:
+		zipInt = v
+	}
+
+	// 2. Map strictly to your provided tbl_company columns
+	query := `
+		UPDATE tbl_company 
+		SET company_name = ?, 
+		    company_type = ?, 
+		    website_url = ?, 
+		    full_address = ?, 
+		    zipcode = ?
+		WHERE company_id = ?
+	`
+
+	_, err := config.DB.Exec(query,
+		req.CompanyName,
+		req.CompanyType,
+		req.WebsiteURL,
+		req.FullAddress,
+		zipInt,
+		companyID,
+	)
+
+	return err
+}
+
+func DeleteCompany(companyID int) error {
+	_, err := config.DB.Exec("UPDATE tbl_company SET is_active = 0 WHERE company_id = ?", companyID)
 	return err
 }

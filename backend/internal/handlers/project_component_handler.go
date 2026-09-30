@@ -8,16 +8,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func HandleGetSupplierProductsBySupplier(c *gin.Context) {
-	supID, _ := strconv.Atoi(c.Param("supplier_id"))
-	prods, err := models.GetComponentSupplierProducts(supID)
-	if err != nil {
-		log.Printf("❌ API Error fetching supplier products: %v\n", err)
-		c.JSON(500, gin.H{"error": "Failed to fetch products"})
-		return
-	}
-	c.JSON(200, prods)
-}
+// func HandleGetSupplierProductsBySupplier(c *gin.Context) {
+// 	supID, _ := strconv.Atoi(c.Param("supplier_id"))
+// 	prods, err := models.GetComponentSupplierProducts(supID)
+// 	if err != nil {
+// 		log.Printf("❌ API Error fetching supplier products: %v\n", err)
+// 		c.JSON(500, gin.H{"error": "Failed to fetch products"})
+// 		return
+// 	}
+// 	c.JSON(200, prods)
+// }
 
 func HandleGetItemComponents(c *gin.Context) {
 	itemID, _ := strconv.Atoi(c.Param("item_id"))

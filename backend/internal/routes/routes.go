@@ -26,6 +26,8 @@ func SetupRouter() *gin.Engine {
 	r.POST("/api/locations/province", handlers.HandleCreateProvince)
 	r.POST("/api/locations/city", handlers.HandleCreateCity)
 	r.GET("/api/companies/:id", handlers.HandleGetCompanyByID)
+	r.PUT("/api/companies/:id", handlers.HandleUpdateCompany)
+	r.DELETE("/api/companies/:id", handlers.HandleDeleteCompany)
 
 	// Contact Person Routes
 	r.GET("/api/companies/:id/contacts", handlers.HandleGetContactPersons)
@@ -81,8 +83,8 @@ func SetupRouter() *gin.Engine {
 	r.PUT("/api/projects/:id/items/:item_id", handlers.HandleUpdateProjectItem)
 	r.DELETE("/api/projects/items/:item_id", handlers.HandleDeleteProjectItem)
 
-	// Component Routes
-	r.GET("/api/suppliers/:supplier_id/products", handlers.HandleGetSupplierProductsBySupplier)
+	// Component RoutesX
+	// r.GET("/api/suppliers/:supplier_id/products", handlers.HandleGetSupplierProductsBySupplier)
 	r.GET("/api/project-items/:item_id/components", handlers.HandleGetItemComponents)
 	r.POST("/api/project-items/components", handlers.HandleAddItemComponent)
 	r.DELETE("/api/project-items/components/:comp_id", handlers.HandleDeleteItemComponent)
@@ -143,6 +145,13 @@ func SetupRouter() *gin.Engine {
 	r.PUT("/api/inventory/history/:added_id", handlers.UpdateAddedStock)
 	r.POST("/api/inventory/return", handlers.ReturnToStock)
 
+	r.GET("/api/attributes", handlers.GetAttributes)
+	r.POST("/api/attributes", handlers.CreateAttribute)
+	r.DELETE("/api/attributes/:id", handlers.DeleteAttribute)
+
+	r.GET("/api/classifications", handlers.GetClassifications)
+	r.POST("/api/classifications", handlers.CreateClassification)
+
 	// MRF Warehouse Routes
 	r.GET("/api/warehouse/mrfs/pending", handlers.GetPendingMRFs)
 	r.GET("/api/warehouse/mrfs/:id/items", handlers.GetMRFItemsForFulfillment)
@@ -156,7 +165,7 @@ func SetupRouter() *gin.Engine {
 
 	// Canvassing & RFQ Routes
 	r.GET("/api/canvass/items", handlers.HandleGetItemsForCanvassing)
-	r.GET("/api/canvass/component/:component_id/quotes", handlers.HandleGetQuotations)
+	r.GET("/api/canvass/item/:mrf_item_id/quotes", handlers.HandleGetQuotations) // <--- UPDATED
 	r.POST("/api/canvass/quotes", handlers.HandleAddQuotation)
 	r.POST("/api/canvass/award", handlers.HandleAwardQuotation)
 	r.PUT("/api/canvass/quotes/:canvass_id", handlers.HandleUpdateQuotation)
@@ -176,6 +185,35 @@ func SetupRouter() *gin.Engine {
 	r.GET("/api/deliveries/:id/client-report", handlers.HandleGetClientHandoverReport)
 
 	r.POST("/api/deliveries/:id/complete", handlers.HandleCompleteDelivery)
+
+	r.GET("/api/currencies", handlers.HandleGetCurrencies)
+
+	// --- Project Parts (Loading List) Routes ---
+	r.GET("/api/projects/:id/parts", handlers.HandleGetProjectParts)
+	r.POST("/api/project-items/parts", handlers.HandleAddProjectPart)
+	r.DELETE("/api/project-items/parts/:id", handlers.HandleDeleteProjectPart)
+
+	// --- Master Project BOM Routes ---
+	r.GET("/api/projects/:id/bom", handlers.HandleGetMasterBOM)
+	r.POST("/api/projects/:id/bom", handlers.HandleAddMasterBOM)
+	r.DELETE("/api/projects/bom/:id", handlers.HandleDeleteMasterBOM)
+	r.GET("/api/uoms", handlers.HandleGetUOMs)
+
+	r.GET("/api/po/incoming", handlers.HandleGetIncomingPO)
+	r.POST("/api/po/receive", handlers.HandleReceiveGoods)
+
+	r.GET("/api/inventory/:id/ledger", handlers.HandleGetItemLedger)
+	r.GET("/api/inventory/suppliers/code/:dbos_code", handlers.HandleGetItemSuppliers)
+
+	r.PUT("/api/po/:po_number/eta", handlers.HandleUpdatePOETA)
+	r.GET("/api/inventory/:id/mrfs", handlers.HandleGetItemMRFHistory)
+
+	r.GET("/api/inventory/:id/suppliers", handlers.HandleGetInventorySuppliers)
+	r.POST("/api/inventory/suppliers", handlers.HandleAddInventorySupplier)
+	r.DELETE("/api/inventory/suppliers/:mapping_id", handlers.HandleDeleteInventorySupplier)
+	r.PUT("/api/inventory/:id/suppliers/:mapping_id/preferred", handlers.HandleSetPreferredSupplier)
+
+	r.GET("/api/inventory/catalog/:dbos_code", handlers.HandleGetCatalogOptions)
 
 	r.Static("/uploads", "./uploads")
 	r.POST("/api/login", handlers.HandleLogin)

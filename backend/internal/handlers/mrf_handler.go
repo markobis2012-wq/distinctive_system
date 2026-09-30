@@ -53,12 +53,16 @@ func CreateProjectMRF(c *gin.Context) {
 		return
 	}
 
+	// NEW: Inject the project ID from the URL parameter directly into the payload struct
+	req.ProjectID = projectID
+
 	if len(req.Items) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot submit an empty MRF"})
 		return
 	}
 
-	if err := models.CreateMRF(projectID, req); err != nil {
+	// NEW: Calls the updated model function
+	if err := models.CreateProjectMRF(req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create MRF: " + err.Error()})
 		return
 	}
@@ -73,7 +77,8 @@ func GetProjectMRFs(c *gin.Context) {
 		return
 	}
 
-	mrfs, err := models.GetMRFsByProject(projectID)
+	// NEW: Calls the updated model function
+	mrfs, err := models.GetProjectMRFs(projectID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch MRFs: " + err.Error()})
 		return

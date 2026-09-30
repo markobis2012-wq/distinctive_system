@@ -2,6 +2,9 @@ package models
 
 import (
 	"backend/internal/config"
+	"database/sql"
+	"fmt"
+	"time"
 )
 
 type Bidding struct {
@@ -274,25 +277,23 @@ func AddBidding(b Bidding) error {
 func UpdateBidding(id int, b Bidding) error {
 	tx, err := config.DB.Begin()
 	if err != nil {
+		fmt.Printf("DB ERROR (Begin Tx): %v\n", err)
 		return err
 	}
 
 	// 1. Update the Bidding record
-	// FIX 1: Changed tbl_biddings to tbl_bidding
-	// FIX 2: Wrapped date fields in NULLIF(?, '') to prevent MySQL empty date crashes
 	query := `
-		UPDATE tbl_bidding SET 
-			is_rfq=?, must_join=?, reference_no=?, solicitation_no=?, procuring_entity=?, client_id=?, 
-			title=?, full_address=?, island_group_id=?, region_id=?, province_id=?, city_id=?, 
-			trade_agreement=?, procurement_mode=?, classification=?, category=?, contact_numbers=?, 
-			approved_budget=?, delivery_period=?, date_published=NULLIF(?, ''), last_update_time=NULLIF(?, ''), 
-			closing_date_time=NULLIF(?, ''), contact_person=?, contact_person_dept=?, contact_number=?, 
-			email=?, alternate_cont_person=?, alternate_cont_dept=?, alt_cont_contacts=?, 
-			alt_cont_email=?, pre_bid_datetime=NULLIF(?, ''), venue=?, itb_status=?, note_desc=?
-		WHERE bidding_id=?
-	`
+        UPDATE tbl_bidding SET 
+            is_rfq=?, must_join=?, reference_no=?, solicitation_no=?, procuring_entity=?, client_id=?, 
+            title=?, full_address=?, island_group_id=?, region_id=?, province_id=?, city_id=?, 
+            trade_agreement=?, procurement_mode=?, classification=?, category=?, contact_numbers=?, 
+            approved_budget=?, delivery_period=?, date_published=NULLIF(?, ''), last_update_time=NULLIF(?, ''), 
+            closing_date_time=NULLIF(?, ''), contact_person=?, contact_person_dept=?, contact_number=?, 
+            email=?, alternate_cont_person=?, alternate_cont_dept=?, alt_cont_contacts=?, 
+            alt_cont_email=?, pre_bid_datetime=NULLIF(?, ''), venue=?, itb_status=?, note_desc=?
+        WHERE bidding_id=?
+    `
 
-	// FIX 3: Changed b.IsRFQ to b.IsRfq to match your struct exactly
 	_, err = tx.Exec(query,
 		b.IsRfq, b.MustJoin, b.ReferenceNo, b.SolicitationNo, b.ProcuringEntity, b.ClientID,
 		b.Title, b.FullAddress, b.IslandGroupID, b.RegionID, b.ProvinceID, b.CityID,
@@ -304,36 +305,70 @@ func UpdateBidding(id int, b Bidding) error {
 		id)
 
 	if err != nil {
+		fmt.Printf("DB ERROR (Bidding Update): %v\n", err)
 		tx.Rollback()
 		return err
 	}
 
-	// ------------------------------------------------------------------------
-	// 2. THE AUTOMATION: If Awarded, automatically create a Project!
-	// ------------------------------------------------------------------------
+	// 2. THE AUTOMATION: If Awarded, automatically create a Project
 	if b.ItbStatus == "Awarded" {
-		// Check if a project already exists for this bidding to avoid duplicates
 		var existingProjectID int
-		err := tx.QueryRow(`SELECT projects_id FROM tbl_projects WHERE bidding_id = ?`, id).Scan(&existingProjectID)
 
-		// If no project is found, create one!
+		// FIX: Added 'AND is_active = 1' and 'LIMIT 1' to ignore soft-deleted projects
+		err := tx.QueryRow(`SELECT projects_id FROM projects WHERE bidding_id = ? AND is_active = 1 LIMIT 1`, id).Scan(&existingProjectID)
+
 		if err != nil {
-			projectQuery := `
-				INSERT INTO tbl_projects 
-				(project_name, client_id, bidding_id, contract_amount, project_status, projects_category, dbos_department_id) 
-				VALUES (?, ?, ?, ?, 'New', ?, 1)
-			`
-			// We pass the Bidding Title as the Project Name, and port over the Client, Budget, and Category
-			_, projErr := tx.Exec(projectQuery, b.Title, b.ClientID, id, b.ApprovedBudget, b.Category)
+			if err == sql.ErrNoRows {
+				fmt.Printf("LOG: No active project found for bidding_id %d. Creating new project...\n", id)
 
-			if projErr != nil {
+				// --- Generate Project Number ---
+				year := time.Now().Year()
+				var currentMax sql.NullInt64
+
+				// Use 'tx' to safely get the max counter for the current year
+				_ = tx.QueryRow("SELECT MAX(project_counter) FROM projects WHERE project_year = ?", year).Scan(&currentMax)
+
+				counter := 1
+				if currentMax.Valid {
+					counter = int(currentMax.Int64) + 1
+				}
+				projectNum := fmt.Sprintf("%d-%03d", year, counter)
+				// ------------------------------------------
+
+				// Added is_active explicitly to the insert query to ensure it defaults properly
+				projectQuery := `
+                    INSERT INTO projects 
+                    (project_name, client_id, bidding_id, contract_amount, project_status, projects_category, dbos_department_id, project_year, project_counter, project_number, project_date_created, is_active) 
+                    VALUES (?, ?, ?, ?, 'Today', ?, 1, ?, ?, ?, CURDATE(), 1)
+                `
+				_, projErr := tx.Exec(projectQuery,
+					b.Title, b.ClientID, id, b.ApprovedBudget, b.Category,
+					year, counter, projectNum,
+				)
+
+				if projErr != nil {
+					fmt.Printf("DB ERROR (Project Insert): %v\n", projErr)
+					tx.Rollback()
+					return projErr
+				}
+				fmt.Printf("LOG: Successfully created new project %s for bidding_id %d.\n", projectNum, id)
+			} else {
+				fmt.Printf("DB ERROR (Project Select): %v\n", err)
 				tx.Rollback()
-				return projErr
+				return err
 			}
+		} else {
+			fmt.Printf("LOG: Active project %d already exists for bidding_id %d. Skipping creation.\n", existingProjectID, id)
 		}
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		fmt.Printf("DB ERROR (Commit Tx): %v\n", err)
+		return err
+	}
+
+	return nil
 }
 
 func DeleteBidding(id int) error {

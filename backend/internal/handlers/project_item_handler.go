@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/internal/models"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -11,12 +12,23 @@ import (
 )
 
 func HandleGetProjectItems(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+
+	log.Printf("---------------------------------------------------")
+	log.Printf("📥 [API HIT] GET /api/projects/%s/items", idStr)
+	log.Printf("⚙️ Parsed Project ID: %d (Error: %v)", id, err)
+
 	items, err := models.GetProjectItems(id)
 	if err != nil {
+		log.Printf("❌ [HANDLER ERROR] Failed to fetch items: %v", err)
 		c.JSON(500, gin.H{"error": "Failed to fetch project items"})
 		return
 	}
+
+	log.Printf("📤 [API SUCCESS] Sending %d items back to frontend", len(items))
+	log.Printf("---------------------------------------------------")
+
 	c.JSON(200, items)
 }
 
@@ -25,14 +37,20 @@ func parseProjectItemForm(c *gin.Context, projectID int) (models.ProjectItem, er
 	i.ProjectID = projectID
 	i.ProductName = c.PostForm("product_name")
 	i.ProductDescription = c.PostForm("product_description")
-	i.SuppliersDescription = c.PostForm("suppliers_description")
 	i.Qty, _ = strconv.Atoi(c.PostForm("qty"))
-	i.Uom, _ = strconv.Atoi(c.PostForm("uom"))
+
+	// FIXED: Updated to UomID to match the model and database
+	i.UomID, _ = strconv.Atoi(c.PostForm("uom_id"))
+
 	i.UnitPrice, _ = strconv.ParseFloat(c.PostForm("unit_price"), 64)
 	i.TotalPrice, _ = strconv.ParseFloat(c.PostForm("total_price"), 64)
-	i.SupProdID, _ = strconv.Atoi(c.PostForm("sup_prod_id"))
 	i.ProjectComponentsTotal = c.PostForm("project_components_total")
 	i.Location = c.PostForm("location")
+
+	// Parse the cached columns sent from the frontend
+	i.QtyInProduction, _ = strconv.ParseFloat(c.PostForm("qty_in_production"), 64)
+	i.QtyReadyForDelivery, _ = strconv.ParseFloat(c.PostForm("qty_ready_for_delivery"), 64)
+	i.QtyDelivered, _ = strconv.ParseFloat(c.PostForm("qty_delivered"), 64)
 
 	dir := fmt.Sprintf("./project_items/%d", projectID)
 	os.MkdirAll(dir, 0755)

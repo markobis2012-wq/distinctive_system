@@ -125,6 +125,23 @@ export default function BiddingPage() {
 
   useEffect(() => { fetchDictionaries(); }, []);
 
+  useEffect(() => {
+    const importData = sessionStorage.getItem('philgeps_import');
+    if (importData) {
+      try {
+        const parsedData = JSON.parse(importData);
+        // Pre-fill the form with the PhilGEPS data
+        setForm(prev => ({ ...prev, ...parsedData }));
+        // Automatically open the modal
+        setIsModalOpen(true);
+        // Clear the memory so it doesn't open every time you refresh
+        sessionStorage.removeItem('philgeps_import');
+      } catch (err) {
+        console.error("Failed to parse import data", err);
+      }
+    }
+  }, []);
+
   const fetchBiddings = async () => {
     try {
       const queryParams = new URLSearchParams({
@@ -197,11 +214,56 @@ export default function BiddingPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_URL}/api/biddings`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form)
+      const payload: any = { ...form };
+      
+      const dateFields = ['date_published', 'last_update_time', 'closing_date_time', 'pre_bid_datetime', 'date_inputted'];
+      dateFields.forEach(field => {
+        if (payload[field] === '') {
+          payload[field] = null;
+        }
       });
-      if (res.ok) { setIsModalOpen(false); fetchBiddings(); }
-    } catch (err) {}
+
+      if (!payload.approved_budget) payload.approved_budget = 0;
+      if (!payload.client_id) payload.client_id = 0;
+
+      const baseUrl = API_URL || ''; 
+
+      const res = await fetch(`${baseUrl}/api/biddings`, {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) { 
+        // 1. Parse the response to get the newly created ID
+        const data = await res.json();
+        
+        // Match this to whatever your backend returns (e.g., data.bidding_id, data.id, or data.insertId)
+        const newId = data.bidding_id || data.id || data.insertId;
+        
+        // 2. Clean up the UI
+        setIsModalOpen(false); 
+        sessionStorage.removeItem('philgeps_import');
+        
+        // 3. Redirect to the detail page if we have the ID, otherwise fallback to refreshing the table
+        if (newId) {
+          router.push(`/admin/bidding/${newId}`);
+        } else {
+          fetchBiddings();
+        }
+      } else {
+        let errorMsg = res.statusText;
+        try {
+          const errorData = await res.json();
+          if (errorData.error) errorMsg = errorData.error;
+        } catch (e) {} 
+        
+        alert(`Failed to save bidding: ${errorMsg}`);
+      }
+    } catch (err: any) {
+      alert(`A network error occurred while saving: ${err.message}`);
+      console.error("Save Error:", err);
+    }
   };
 
   const handleInlineUpdate = async (id: number, field: string, value: any) => {

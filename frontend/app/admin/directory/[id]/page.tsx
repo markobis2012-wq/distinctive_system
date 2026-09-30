@@ -9,8 +9,16 @@ import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
 
-// Editable Field Component
-const EditableField = ({ label, value, onSave }: { label: string; value: string; onSave: (val: string) => void }) => {
+// UPDATED: Editable Field Component now supports dropdowns ('select')
+interface EditableFieldProps {
+  label: string;
+  value: string;
+  onSave: (val: string) => void;
+  type?: 'text' | 'select';
+  options?: string[];
+}
+
+const EditableField = ({ label, value, onSave, type = 'text', options = [] }: EditableFieldProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempVal, setTempVal] = useState(value);
 
@@ -24,7 +32,16 @@ const EditableField = ({ label, value, onSave }: { label: string; value: string;
       <div className="flex flex-col gap-1 w-full">
         <span className="text-xs font-semibold text-slate-500 uppercase">{label}</span>
         <div className="flex items-center gap-2">
-          <input autoFocus type="text" value={tempVal} onChange={(e) => setTempVal(e.target.value)} className="w-full px-3 py-1.5 border border-blue-400 rounded focus:ring-2 focus:ring-blue-600 outline-none text-sm" />
+          {type === 'select' ? (
+            <select autoFocus value={tempVal} onChange={(e) => setTempVal(e.target.value)} className="w-full px-3 py-1.5 border border-blue-400 rounded focus:ring-2 focus:ring-blue-600 outline-none text-sm bg-white">
+              <option value="">Select Type...</option>
+              {options.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          ) : (
+            <input autoFocus type="text" value={tempVal} onChange={(e) => setTempVal(e.target.value)} className="w-full px-3 py-1.5 border border-blue-400 rounded focus:ring-2 focus:ring-blue-600 outline-none text-sm" />
+          )}
           <button onClick={handleSave} className="p-1.5 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200"><Check className="h-4 w-4" /></button>
           <button onClick={() => { setTempVal(value); setIsEditing(false); }} className="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200"><X className="h-4 w-4" /></button>
         </div>
@@ -287,6 +304,29 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
     } catch (err) {}
   };
 
+  // Update Company general info handler
+  const handleUpdateCompanyInfo = async (updatedFields: Partial<any>) => {
+    const updatedCompany = { ...company, ...updatedFields };
+    // Optimistically update the UI immediately
+    setCompany(updatedCompany);
+    
+    try {
+      const res = await fetch(`${API_URL}/api/companies/${companyId}`, { 
+        method: 'PUT', 
+        body: JSON.stringify(updatedCompany), 
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to update company");
+      }
+    } catch (err) {
+      console.error(err);
+      // Revert the state if the API fails by fetching the true DB state
+      fetchCompany();
+    }
+  };
+
   if (error) return <div className="p-6 text-red-500">{error}</div>;
   if (!company) return <div className="p-6 text-slate-500">Loading company details...</div>;
 
@@ -318,21 +358,38 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">General Information</h3>
               <div className="grid grid-cols-1 gap-4">
-                <EditableField label="Company Name" value={company.company_name} onSave={(v) => setCompany({ ...company, company_name: v })} />
-                <EditableField label="Company Type" value={company.company_type} onSave={(v) => setCompany({ ...company, company_type: v })} />
-                <EditableField label="Website URL" value={company.website_url} onSave={(v) => setCompany({ ...company, website_url: v })} />
+                <EditableField 
+                  label="Company Name" 
+                  value={company.company_name} 
+                  onSave={(v) => handleUpdateCompanyInfo({ company_name: v })} 
+                />
+                
+                {/* UPDATED: Company Type is now a Dropdown */}
+                <EditableField 
+                  label="Company Type" 
+                  value={company.company_type} 
+                  type="select"
+                  options={["Client Government", "Supplier Local", "Supplier International", "Client Private"]}
+                  onSave={(v) => handleUpdateCompanyInfo({ company_type: v })} 
+                />
+
+                <EditableField 
+                  label="Website URL" 
+                  value={company.website_url} 
+                  onSave={(v) => handleUpdateCompanyInfo({ website_url: v })} 
+                />
               </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2"><MapPin className="h-5 w-5 text-slate-400" /> Location Details</h3>
               <div className="grid grid-cols-1 gap-4">
-                <EditableField label="Full Address" value={company.full_address} onSave={(v) => setCompany({ ...company, full_address: v })} />
-                <EditableField label="Island Group" value={company.island_group} onSave={() => {}} />
-                <EditableField label="Region" value={company.region} onSave={() => {}} />
-                <EditableField label="Province" value={company.province} onSave={() => {}} />
-                <EditableField label="City" value={company.city} onSave={() => {}} />
-                <EditableField label="Zipcode" value={company.zipcode} onSave={(v) => setCompany({ ...company, zipcode: v })} />
+                <EditableField label="Full Address" value={company.full_address} onSave={(v) => handleUpdateCompanyInfo({ full_address: v })} />
+                <EditableField label="Island Group" value={company.island_group} onSave={(v) => handleUpdateCompanyInfo({ island_group: v })} />
+                <EditableField label="Region" value={company.region} onSave={(v) => handleUpdateCompanyInfo({ region: v })} />
+                <EditableField label="Province" value={company.province} onSave={(v) => handleUpdateCompanyInfo({ province: v })} />
+                <EditableField label="City" value={company.city} onSave={(v) => handleUpdateCompanyInfo({ city: v })} />
+                <EditableField label="Zipcode" value={company.zipcode} onSave={(v) => handleUpdateCompanyInfo({ zipcode: v })} />
               </div>
             </div>
           </div>
@@ -383,7 +440,10 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                                   <td className="px-4 py-3">{cp.department || '-'}</td>
                                   <td className="px-4 py-3">{cp.mobile || cp.phone || '-'}</td>
                                   <td className="px-4 py-3">{cp.email || '-'}</td>
-                                  <td className="px-4 py-3">{cp.is_primary === 1 && <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800"><UserCheck className="h-3 w-3 mr-1" /> Primary</span>}</td>
+                                  <td className="px-4 py-3">
+                                    {cp.is_primary === 1 && <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800"><UserCheck className="h-3 w-3 mr-1" /> Primary</span>}
+                                    {cp.is_primary === 0 && <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800"><UserCheck className="h-3 w-3 mr-1" /> Not Primary</span>}
+                                  </td>
                                   <td className="px-4 py-3 text-right space-x-3">
                                     <button onClick={() => openCpModal(cp)} className="text-blue-600 hover:text-blue-800 font-medium text-xs">Edit</button>
                                     <button onClick={() => handleDeleteContact(cp)} className="text-red-600 hover:text-red-800 font-medium text-xs">Delete</button>
@@ -547,8 +607,48 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
           <div className="bg-white rounded-xl shadow-lg border border-slate-200 max-w-lg w-full p-6">
             <h3 className="text-lg font-bold text-slate-900 mb-4">{editingCpId ? 'Edit Contact' : 'Add Contact'}</h3>
             <form onSubmit={handleSaveCp} className="space-y-4">
-              <div><label className="block text-sm font-medium text-slate-700 mb-1">Full Name *</label><input type="text" required value={cpForm.contact_person_name} onChange={(e) => setCpForm({ ...cpForm, contact_person_name: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none" /></div>
-              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsCpModalOpen(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button><button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">Save</button></div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Full Name *</label>
+                <input type="text" required value={cpForm.contact_person_name} onChange={(e) => setCpForm({ ...cpForm, contact_person_name: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none" />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+                <input type="text" value={cpForm.department} onChange={(e) => setCpForm({ ...cpForm, department: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Mobile</label>
+                  <input type="text" value={cpForm.mobile} onChange={(e) => setCpForm({ ...cpForm, mobile: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+                  <input type="text" value={cpForm.phone} onChange={(e) => setCpForm({ ...cpForm, phone: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                <input type="email" value={cpForm.email} onChange={(e) => setCpForm({ ...cpForm, email: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none" />
+              </div>
+
+              <div className="pt-2">
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={cpForm.is_primary === 1} 
+                    onChange={(e) => setCpForm({ ...cpForm, is_primary: e.target.checked ? 1 : 0 })} 
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                  /> 
+                  Set as Primary Contact
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onClick={() => setIsCpModalOpen(false)} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Save</button>
+              </div>
             </form>
           </div>
         </div>

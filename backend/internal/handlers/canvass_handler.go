@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"backend/internal/models"
+	"log"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -17,8 +19,12 @@ func HandleGetItemsForCanvassing(c *gin.Context) {
 }
 
 func HandleGetQuotations(c *gin.Context) {
-	compID, _ := strconv.Atoi(c.Param("component_id"))
-	quotes, err := models.GetQuotationsForComponent(compID)
+	mrfItemID, err := strconv.Atoi(c.Param("mrf_item_id")) // Updated Param name
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid MRF Item ID"})
+		return
+	}
+	quotes, err := models.GetQuotationsForComponent(mrfItemID)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -27,7 +33,7 @@ func HandleGetQuotations(c *gin.Context) {
 }
 
 func HandleAddQuotation(c *gin.Context) {
-	var q models.Quotation
+	var q models.AddQuoteRequest
 	if err := c.ShouldBindJSON(&q); err != nil {
 		c.JSON(400, gin.H{"error": "Invalid input"})
 		return
@@ -41,14 +47,14 @@ func HandleAddQuotation(c *gin.Context) {
 
 func HandleAwardQuotation(c *gin.Context) {
 	var body struct {
-		CanvassID   int `json:"canvass_id"`
-		ComponentID int `json:"project_item_component_id"`
+		CanvassID int `json:"canvass_id"`
+		MRFItemID int `json:"mrf_item_id"` // Updated payload mapping
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": "Invalid input"})
 		return
 	}
-	if err := models.AwardQuotation(body.CanvassID, body.ComponentID); err != nil {
+	if err := models.AwardQuotation(body.CanvassID, body.MRFItemID); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
@@ -93,7 +99,7 @@ func HandleAddBulkQuotations(c *gin.Context) {
 }
 
 func HandleGetAwardedComponents(c *gin.Context) {
-	items, err := models.GetAwardedComponents()
+	items, err := models.GetAwardedItemsForPO()
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -102,15 +108,12 @@ func HandleGetAwardedComponents(c *gin.Context) {
 }
 
 func HandleGeneratePO(c *gin.Context) {
-	var req struct {
-		PONumber     string `json:"po_number"`
-		ComponentIDs []int  `json:"component_ids"`
-	}
+	var req models.GeneratePORequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "Invalid input"})
 		return
 	}
-	if err := models.GeneratePO(req.PONumber, req.ComponentIDs); err != nil {
+	if err := models.GeneratePO(req); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
@@ -119,15 +122,32 @@ func HandleGeneratePO(c *gin.Context) {
 
 func HandleCancelAward(c *gin.Context) {
 	var body struct {
-		ComponentID int `json:"project_item_component_id"`
+		MRFItemID int `json:"mrf_item_id"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": "Invalid input"})
 		return
 	}
-	if err := models.CancelAward(body.ComponentID); err != nil {
+	if err := models.CancelAward(body.MRFItemID); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(200, gin.H{"message": "Award cancelled successfully!"})
+}
+
+func HandleDeleteCompany(c *gin.Context) {
+	idParam := c.Param("id")
+	companyID, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid company ID"})
+		return
+	}
+
+	if err := models.DeleteCompany(companyID); err != nil {
+		log.Printf("==> [DB ERROR] Failed to delete company %d: %v\n", companyID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete company"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Company deleted successfully"})
 }
