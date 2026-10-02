@@ -77,6 +77,7 @@ type Quotation struct {
 type AddQuoteRequest struct {
 	MRFItemID          int     `json:"mrf_item_id"`
 	SupplierID         int     `json:"supplier_id"`
+	SupplierProductID  int     `json:"supplier_product_id"` // ADDED THIS
 	RFQNumber          string  `json:"rfq_number"`
 	QuotedUnitPrice    float64 `json:"quoted_unit_price"`
 	QuotedLandedPrice  float64 `json:"quoted_landed_price"`
@@ -113,10 +114,12 @@ func GetQuotationsForComponent(mrfItemID int) ([]Quotation, error) {
 }
 
 func AddQuotation(req AddQuoteRequest) error {
+	// Added supplier_product_id to the query
 	_, err := config.DB.Exec(`
-		INSERT INTO tbl_canvass_quotations (mrf_item_id, supplier_id, rfq_number, quoted_unit_price, quoted_landed_price, quoted_selling_price, remarks) 
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		req.MRFItemID, req.SupplierID, req.RFQNumber, req.QuotedUnitPrice, req.QuotedLandedPrice, req.QuotedSellingPrice, req.Remarks)
+		INSERT INTO tbl_canvass_quotations 
+		(mrf_item_id, supplier_id, supplier_product_id, rfq_number, quoted_unit_price, quoted_landed_price, quoted_selling_price, remarks) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		req.MRFItemID, req.SupplierID, req.SupplierProductID, req.RFQNumber, req.QuotedUnitPrice, req.QuotedLandedPrice, req.QuotedSellingPrice, req.Remarks)
 	return err
 }
 
@@ -146,11 +149,19 @@ func AwardQuotation(canvassID int, mrfItemID int) error {
 		return err
 	}
 
+	// 3. NEW: Tell the MRF Item that it has been successfully sourced!
+	// This makes it show as "Supplier Awarded" on the frontend and moves it to the PO queue.
+	_, err = tx.Exec(`UPDATE tbl_mrf_items SET has_selected_supplier = 1 WHERE mrf_item_id = ?`, mrfItemID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	return tx.Commit()
 }
 
 func CancelAward(mrfItemID int) error {
-	// First, check if this item has already been assigned to a PO!
+	// First, check if this item has already been assigned to a PO
 	var exists bool
 	err := config.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM tbl_po_items WHERE mrf_item_id = ?)`, mrfItemID).Scan(&exists)
 	if err != nil {
@@ -160,8 +171,26 @@ func CancelAward(mrfItemID int) error {
 		return errors.New("cannot cancel award: this item has already been locked into a Purchase Order")
 	}
 
-	_, err = config.DB.Exec(`UPDATE tbl_canvass_quotations SET is_selected = 0 WHERE mrf_item_id = ?`, mrfItemID)
-	return err
+	tx, err := config.DB.Begin()
+	if err != nil {
+		return err
+	}
+
+	// 1. Remove the award status
+	_, err = tx.Exec(`UPDATE tbl_canvass_quotations SET is_selected = 0 WHERE mrf_item_id = ?`, mrfItemID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// 2. NEW: Push the item back to the Canvassing Board queue
+	_, err = tx.Exec(`UPDATE tbl_mrf_items SET has_selected_supplier = 0 WHERE mrf_item_id = ?`, mrfItemID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }
 
 type BulkRFQRequest struct {

@@ -60,6 +60,12 @@ func CreateInventoryItem(c *gin.Context) {
 	attributesJSON := c.PostForm("attributes")
 	classificationsJSON := c.PostForm("classifications")
 
+	// 1. Grab the UOM ID from the form and convert to integer
+	uomID, err := strconv.Atoi(c.PostForm("uom_id"))
+	if err != nil {
+		uomID = 1 // Safe fallback if parsing fails, but frontend should always send it now
+	}
+
 	var imagePath string
 	file, err := c.FormFile("image")
 	if err == nil {
@@ -71,11 +77,12 @@ func CreateInventoryItem(c *gin.Context) {
 		}
 	}
 
+	// 2. Pass the dynamic uomID instead of hardcoding '1'
 	inv := models.Inventory{
 		DBOSCode:      dbosCode,
 		InventoryName: inventoryName,
 		Description:   desc,
-		UOMID:         1,
+		UOMID:         uomID,
 		ImagePath:     imagePath,
 		IsActive:      true,
 	}
@@ -87,7 +94,7 @@ func CreateInventoryItem(c *gin.Context) {
 	}
 
 	// Save Dynamic Attributes
-	if attributesJSON != "" {
+	if attributesJSON != "" && attributesJSON != "[]" {
 		var attrs []models.InvAttribute
 		if err := json.Unmarshal([]byte(attributesJSON), &attrs); err == nil {
 			models.SaveInventoryAttributes(id, attrs)
@@ -95,7 +102,7 @@ func CreateInventoryItem(c *gin.Context) {
 	}
 
 	// Save Dynamic Classifications
-	if classificationsJSON != "" {
+	if classificationsJSON != "" && classificationsJSON != "[]" {
 		var classIDs []int
 		if err := json.Unmarshal([]byte(classificationsJSON), &classIDs); err == nil {
 			models.SaveInventoryClassifications(id, classIDs)
@@ -311,4 +318,37 @@ func HandleSetPreferredSupplier(c *gin.Context) {
 	mapID, _ := strconv.Atoi(c.Param("mapping_id"))
 	models.SetPreferredSupplier(invID, mapID)
 	c.JSON(200, gin.H{"message": "Preferred supplier updated"})
+}
+
+func HandleGetTransactionTypes(c *gin.Context) {
+	types, err := models.GetTransactionTypes()
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, types)
+}
+
+func HandleAddManualLedgerEntry(c *gin.Context) {
+	invID, _ := strconv.Atoi(c.Param("id"))
+	var req models.ManualLedgerEntry
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	if err := models.AddManualLedgerEntry(invID, req); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "Transaction recorded successfully"})
+}
+
+func HandleDeleteLedgerEntry(c *gin.Context) {
+	ledgerID, _ := strconv.Atoi(c.Param("ledger_id"))
+	if err := models.DeleteLedgerEntry(ledgerID); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"message": "Transaction deleted successfully"})
 }

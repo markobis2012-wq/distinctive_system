@@ -215,6 +215,11 @@ func SetupRouter() *gin.Engine {
 
 	r.GET("/api/inventory/catalog/:dbos_code", handlers.HandleGetCatalogOptions)
 
+	r.GET("/api/transactions/types", handlers.HandleGetTransactionTypes)
+	r.POST("/api/inventory/:id/ledger/manual", handlers.HandleAddManualLedgerEntry)
+
+	r.DELETE("/api/inventory/ledger/:ledger_id", handlers.HandleDeleteLedgerEntry)
+
 	r.Static("/uploads", "./uploads")
 	r.POST("/api/login", handlers.HandleLogin)
 

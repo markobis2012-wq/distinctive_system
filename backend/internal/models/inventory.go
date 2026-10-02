@@ -3,6 +3,8 @@ package models
 import (
 	"backend/internal/config"
 	"errors"
+	"fmt"
+	"log"
 	"time"
 )
 
@@ -20,25 +22,25 @@ type InvAttribute struct {
 }
 
 type Inventory struct {
-	InventoryID     int              `json:"inventory_id"`
-	DBOSCode        string           `json:"dbos_code"`
-	InventoryName   string           `json:"inventory_name"`
-	Description     string           `json:"description"`
-	UOMID           int              `json:"uom_id"`
-	QtyOnHand       float64          `json:"qty_on_hand"`
-	ImagePath       string           `json:"image_path"`
-	IsActive        bool             `json:"is_active"`
-	Attributes      []InvAttribute   `json:"attributes"`
-	Classifications []Classification `json:"classifications"` // NEW
+	InventoryID     int              `json:"inventory_id" form:"inventory_id"`
+	DBOSCode        string           `json:"dbos_code" form:"dbos_code"`
+	InventoryName   string           `json:"inventory_name" form:"inventory_name"`
+	Description     string           `json:"description" form:"description"`
+	UOMID           int              `json:"uom_id" form:"uom_id"`
+	QtyOnHand       float64          `json:"qty_on_hand" form:"qty_on_hand"`
+	ImagePath       string           `json:"image_path" form:"image_path"`
+	IsActive        bool             `json:"is_active" form:"is_active"`
+	Attributes      []InvAttribute   `json:"attributes" form:"attributes"`
+	Classifications []Classification `json:"classifications" form:"classifications"` // NEW
 }
 
 type AddStockRequest struct {
-	SupplierID        int     `json:"supplier_id"`
-	SupplierProductID int     `json:"supplier_product_id"`
-	QtyAdded          float64 `json:"qty_added"`
-	UOMID             int     `json:"uom_id"`
-	Remarks           string  `json:"remarks"`
-	CreatedBy         string  `json:"created_by"` // NEW: Pass the user who made the addition
+	SupplierID        int     `json:"supplier_id" form:"supplier_id"`
+	SupplierProductID int     `json:"supplier_product_id" form:"supplier_product_id"`
+	QtyAdded          float64 `json:"qty_added" form:"qty_added"`
+	UOMID             int     `json:"uom_id" form:"uom_id"`
+	Remarks           string  `json:"remarks" form:"remarks"`
+	CreatedBy         string  `json:"created_by" form:"created_by"` // NEW: Pass the user who made the addition
 }
 
 type LedgerHistory struct {
@@ -157,10 +159,10 @@ func GetAllInventory() ([]Inventory, error) {
 
 	// 1. Fetch & Attach Attributes
 	attrQuery := `
-		SELECT ia.inventory_id, a.attribute_id, a.attribute_name, a.data_type, ia.attribute_value 
-		FROM tbl_inventory_attributes ia 
-		JOIN tbl_attributes a ON ia.attribute_id = a.attribute_id
-	`
+        SELECT ia.inventory_id, a.attribute_id, a.attribute_name, a.data_type, ia.attribute_value 
+        FROM tbl_inventory_attributes ia 
+        JOIN tbl_attributes a ON ia.attribute_id = a.attribute_id
+    `
 	attrRows, err := config.DB.Query(attrQuery)
 	if err == nil {
 		defer attrRows.Close()
@@ -177,10 +179,10 @@ func GetAllInventory() ([]Inventory, error) {
 
 	// 2. Fetch & Attach Classifications (Tags)
 	classQuery := `
-		SELECT ic.inventory_id, c.classification_id, c.classification_name 
-		FROM tbl_inventory_classifications ic 
-		JOIN tbl_classifications c ON ic.classification_id = c.classification_id
-	`
+        SELECT ic.inventory_id, c.classification_id, c.classification_name 
+        FROM tbl_inventory_classifications ic 
+        JOIN tbl_classifications c ON ic.classification_id = c.classification_id
+    `
 	classRows, err := config.DB.Query(classQuery)
 	if err == nil {
 		defer classRows.Close()
@@ -235,9 +237,24 @@ func SaveInventoryAttributes(invID int, attrs []InvAttribute) error {
 }
 
 func CreateInventory(inv Inventory) (int, error) {
+	log.Println("====== INVENTORY CREATION LOG (BACKEND) ======")
+	// %+v prints the struct names alongside their values so you can see EVERYTHING Gin captured
+	log.Printf("Raw struct received: %+v\n", inv)
+	log.Printf("DBOS Code: '%s'", inv.DBOSCode)
+	log.Printf("Item Name: '%s'", inv.InventoryName)
+	log.Printf("UOM ID Received: %d", inv.UOMID)
+	log.Println("==============================================")
+
+	if inv.UOMID == 0 {
+		log.Println("CRITICAL ERROR: UOMID is 0! The backend failed to capture the uom_id from the frontend form.")
+		// Fail and return an error so the frontend doesn't save bad data with UOM = 1
+		return 0, errors.New("uom_id is missing or 0. Form data did not bind correctly")
+	}
+
 	query := `INSERT INTO tbl_inventory (dbos_code, inventory_name, description, uom_id, qty_on_hand, image_path, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)`
 	res, err := config.DB.Exec(query, inv.DBOSCode, inv.InventoryName, inv.Description, inv.UOMID, 0.00, inv.ImagePath, true)
 	if err != nil {
+		log.Printf("Database execution error: %v\n", err)
 		return 0, err
 	}
 	id, _ := res.LastInsertId()
@@ -274,9 +291,9 @@ func AddInventoryStock(inventoryID int, req AddStockRequest) error {
 	// 1. Insert into Central Ledger
 	// Passing SupplierID as the ReferenceID if it's a PO
 	_, err = tx.Exec(`
-		INSERT INTO tbl_inventory_ledger 
-		(inventory_id, transaction_type_id, qty_change, reference_id, remarks, created_by) 
-		VALUES (?, ?, ?, ?, ?, ?)`,
+        INSERT INTO tbl_inventory_ledger 
+        (inventory_id, transaction_type_id, qty_change, reference_id, remarks, created_by) 
+        VALUES (?, ?, ?, ?, ?, ?)`,
 		inventoryID, transactionTypeID, req.QtyAdded, req.SupplierID, req.Remarks, req.CreatedBy,
 	)
 	if err != nil {
@@ -297,16 +314,18 @@ func AddInventoryStock(inventoryID int, req AddStockRequest) error {
 
 func GetInventoryLedgerHistory(inventoryID int) ([]ItemLedgerEntry, error) {
 	query := `
-		SELECT 
-			DATE_FORMAT(l.created_at, '%Y-%m-%d %H:%i') as created_at, 
-			tt.transaction_name, 
-			l.qty_change, 
-			COALESCE(l.destination, 'N/A'), 
-			COALESCE(l.remarks, '')
-		FROM tbl_inventory_ledger l
-		JOIN tbl_inventory_transaction_types tt ON l.transaction_type_id = tt.transaction_type_id
-		WHERE l.inventory_id = ? 
-		ORDER BY l.created_at DESC`
+        SELECT 
+            l.ledger_id,
+            DATE_FORMAT(l.created_at, '%Y-%m-%d %H:%i') as created_at, 
+            tt.transaction_name, 
+            l.qty_change, 
+            COALESCE(l.destination, 'N/A'), 
+            COALESCE(l.remarks, ''),
+            COALESCE(l.created_by, '')
+        FROM tbl_inventory_ledger l
+        JOIN tbl_inventory_transaction_types tt ON l.transaction_type_id = tt.transaction_type_id
+        WHERE l.inventory_id = ? 
+        ORDER BY l.created_at DESC`
 
 	rows, err := config.DB.Query(query, inventoryID)
 	if err != nil {
@@ -317,7 +336,8 @@ func GetInventoryLedgerHistory(inventoryID int) ([]ItemLedgerEntry, error) {
 	var list []ItemLedgerEntry
 	for rows.Next() {
 		var e ItemLedgerEntry
-		if err := rows.Scan(&e.CreatedAt, &e.TransactionName, &e.QtyChange, &e.Destination, &e.Remarks); err == nil {
+		// Make sure Scan matches the exact order of the SELECT statement
+		if err := rows.Scan(&e.LedgerID, &e.CreatedAt, &e.TransactionName, &e.QtyChange, &e.Destination, &e.Remarks, &e.CreatedBy); err == nil {
 			list = append(list, e)
 		}
 	}
@@ -370,10 +390,10 @@ func UpdateInventoryLedgerStock(ledgerID int, newQtyChange float64, newRemarks s
 
 func GetInventoryAddedHistory(inventoryID int) ([]AddedStockHistory, error) {
 	query := `
-		SELECT a.add_inventory_id, COALESCE(c.company_name, 'Unknown'), a.qty_added, COALESCE(a.remarks, ''), a.date_added 
-		FROM tbl_inventory_added a
-		LEFT JOIN tbl_company c ON a.supplier_id = c.company_id
-		WHERE a.inventory_id = ? ORDER BY a.date_added DESC`
+        SELECT a.add_inventory_id, COALESCE(c.company_name, 'Unknown'), a.qty_added, COALESCE(a.remarks, ''), a.date_added 
+        FROM tbl_inventory_added a
+        LEFT JOIN tbl_company c ON a.supplier_id = c.company_id
+        WHERE a.inventory_id = ? ORDER BY a.date_added DESC`
 	rows, err := config.DB.Query(query, inventoryID)
 	if err != nil {
 		return nil, err
@@ -460,9 +480,9 @@ func ProcessReturnToStock(req RTSRequest) error {
 	}
 
 	_, err = tx.Exec(`
-		INSERT INTO tbl_inventory_ledger 
-		(inventory_id, transaction_type_id, qty_change, project_id, remarks, created_by) 
-		VALUES (?, 5, ?, ?, ?, ?)`,
+        INSERT INTO tbl_inventory_ledger 
+        (inventory_id, transaction_type_id, qty_change, project_id, remarks, created_by) 
+        VALUES (?, 5, ?, ?, ?, ?)`,
 		req.InventoryID, req.ReturnQty, req.ProjectID, remarks, req.CreatedBy,
 	)
 	if err != nil {
@@ -482,11 +502,13 @@ func ProcessReturnToStock(req RTSRequest) error {
 }
 
 type ItemLedgerEntry struct {
+	LedgerID        int     `json:"ledger_id"` // Add this
 	CreatedAt       string  `json:"created_at"`
 	TransactionName string  `json:"transaction_name"`
 	QtyChange       float64 `json:"qty_change"`
 	Destination     string  `json:"destination"`
 	Remarks         string  `json:"remarks"`
+	CreatedBy       string  `json:"created_by"` // Add this
 }
 
 type ItemSupplier struct {
@@ -498,10 +520,10 @@ type ItemSupplier struct {
 
 func GetSuppliersForItem(dbosCode string) ([]ItemSupplier, error) {
 	query := `
-		SELECT c.company_name, COALESCE(sp.sup_product_code, 'N/A'), COALESCE(sp.products_price, '0'), sp.land_price
-		FROM tbl_supplier_products sp
-		JOIN tbl_company c ON sp.company_id = c.company_id
-		WHERE sp.dbos_code = ? AND sp.is_active = 1`
+        SELECT c.company_name, COALESCE(sp.sup_product_code, 'N/A'), COALESCE(sp.products_price, '0'), sp.land_price
+        FROM tbl_supplier_products sp
+        JOIN tbl_company c ON sp.company_id = c.company_id
+        WHERE sp.dbos_code = ? AND sp.is_active = 1`
 
 	rows, err := config.DB.Query(query, dbosCode)
 	if err != nil {
@@ -526,6 +548,7 @@ type ItemMRFHistory struct {
 	MRFNumber    string  `json:"mrf_number"`
 	ProjectName  string  `json:"project_name"`
 	QtyRequested float64 `json:"qty_requested"`
+	QtyIssued    float64 `json:"qty_issued"` // NEW: Added to support the frontend pending calculations
 	Status       string  `json:"status"`
 	PONumber     string  `json:"po_number"`
 	POEta        string  `json:"po_eta"`
@@ -533,23 +556,26 @@ type ItemMRFHistory struct {
 
 func GetItemMRFHistory(inventoryID int) ([]ItemMRFHistory, error) {
 	query := `
-		SELECT 
-			m.mrf_number, 
-			p.project_name, 
-			mi.qty_requested, 
-			mi.status, 
-			COALESCE(po.po_number, 'N/A'), 
-			COALESCE(CAST(po.expected_delivery_date AS CHAR), 'Pending Update')
-		FROM tbl_mrf_items mi
-		JOIN tbl_mrfs m ON mi.mrf_id = m.mrf_id
-		JOIN projects p ON m.project_id = p.projects_id
-		LEFT JOIN tbl_po_items poi ON poi.mrf_item_id = mi.mrf_item_id
-		LEFT JOIN tbl_po po ON poi.po_id = po.po_id
-		WHERE mi.inventory_id = ?
-		ORDER BY m.date_requested DESC`
+        SELECT 
+            m.mrf_number, 
+            p.project_name, 
+            mi.qty_requested, 
+            COALESCE(mi.qty_issued, 0) as qty_issued,
+            mi.status, 
+            COALESCE(po.po_number, 'N/A'), 
+            COALESCE(CAST(po.expected_delivery_date AS CHAR), 'Pending Update')
+        FROM tbl_mrf_items mi
+        JOIN tbl_mrf m ON mi.mrf_id = m.mrf_id
+        JOIN projects p ON m.project_id = p.projects_id
+        LEFT JOIN tbl_po_items poi ON poi.mrf_item_id = mi.mrf_item_id
+        LEFT JOIN tbl_po po ON poi.po_id = po.po_id
+        WHERE mi.inventory_id = ?
+        ORDER BY m.date_requested DESC`
 
 	rows, err := config.DB.Query(query, inventoryID)
 	if err != nil {
+		// THIS WILL PRINT THE EXACT MYSQL ERROR TO YOUR TERMINAL
+		log.Printf("❌ SQL ERROR in GetItemMRFHistory: %v\n", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -557,8 +583,11 @@ func GetItemMRFHistory(inventoryID int) ([]ItemMRFHistory, error) {
 	var list []ItemMRFHistory
 	for rows.Next() {
 		var h ItemMRFHistory
-		if err := rows.Scan(&h.MRFNumber, &h.ProjectName, &h.QtyRequested, &h.Status, &h.PONumber, &h.POEta); err == nil {
+		// Notice QtyIssued is now included in the Scan
+		if err := rows.Scan(&h.MRFNumber, &h.ProjectName, &h.QtyRequested, &h.QtyIssued, &h.Status, &h.PONumber, &h.POEta); err == nil {
 			list = append(list, h)
+		} else {
+			log.Printf("❌ SCAN ERROR in GetItemMRFHistory: %v\n", err)
 		}
 	}
 	if list == nil {
@@ -588,15 +617,15 @@ type CatalogItem struct {
 
 func GetInventorySuppliers(inventoryID int) ([]InventorySupplier, error) {
 	query := `
-		SELECT 
-			map.mapping_id, map.inventory_id, map.supplier_product_id,
-			c.company_name, COALESCE(sp.sup_product_code, ''), sp.supplier_product_name,
-			map.lead_time_days, map.moq, COALESCE(sp.land_price, 0), map.is_preferred
-		FROM tbl_inventory_suppliers map
-		JOIN tbl_supplier_products sp ON map.supplier_product_id = sp.supplier_product_id
-		JOIN tbl_company c ON sp.company_id = c.company_id
-		WHERE map.inventory_id = ?
-		ORDER BY map.is_preferred DESC, c.company_name ASC`
+        SELECT 
+            map.mapping_id, map.inventory_id, map.supplier_product_id,
+            c.company_name, COALESCE(sp.sup_product_code, ''), sp.supplier_product_name,
+            map.lead_time_days, map.moq, COALESCE(sp.land_price, 0), map.is_preferred
+        FROM tbl_inventory_suppliers map
+        JOIN tbl_supplier_products sp ON map.supplier_product_id = sp.supplier_product_id
+        JOIN tbl_company c ON sp.company_id = c.company_id
+        WHERE map.inventory_id = ?
+        ORDER BY map.is_preferred DESC, c.company_name ASC`
 
 	rows, err := config.DB.Query(query, inventoryID)
 	if err != nil {
@@ -619,10 +648,10 @@ func GetInventorySuppliers(inventoryID int) ([]InventorySupplier, error) {
 
 func GetCatalogOptionsForMapping(dbosCode string) ([]CatalogItem, error) {
 	query := `
-		SELECT sp.supplier_product_id, c.company_name, sp.supplier_product_name
-		FROM tbl_supplier_products sp
-		JOIN tbl_company c ON sp.company_id = c.company_id
-		WHERE sp.dbos_code = ? AND sp.is_active = 1`
+        SELECT sp.supplier_product_id, c.company_name, sp.supplier_product_name
+        FROM tbl_supplier_products sp
+        JOIN tbl_company c ON sp.company_id = c.company_id
+        WHERE sp.dbos_code = ? AND sp.is_active = 1`
 
 	rows, err := config.DB.Query(query, dbosCode)
 	if err != nil {
@@ -645,8 +674,8 @@ func GetCatalogOptionsForMapping(dbosCode string) ([]CatalogItem, error) {
 
 func AddInventorySupplier(s InventorySupplier) error {
 	_, err := config.DB.Exec(`
-		INSERT INTO tbl_inventory_suppliers (inventory_id, supplier_product_id, lead_time_days, moq) 
-		VALUES (?, ?, ?, ?)`,
+        INSERT INTO tbl_inventory_suppliers (inventory_id, supplier_product_id, lead_time_days, moq) 
+        VALUES (?, ?, ?, ?)`,
 		s.InventoryID, s.SupplierProductID, s.LeadTimeDays, s.MOQ)
 	return err
 }
@@ -671,5 +700,124 @@ func SetPreferredSupplier(inventoryID int, mappingID int) error {
 		tx.Rollback()
 		return err
 	}
+	return tx.Commit()
+}
+
+type TransactionType struct {
+	TransactionTypeID int    `json:"transaction_type_id"`
+	TransactionCode   string `json:"transaction_code"`
+	TransactionName   string `json:"transaction_name"`
+}
+
+func GetTransactionTypes() ([]TransactionType, error) {
+	query := `SELECT transaction_type_id, transaction_code, transaction_name FROM tbl_inventory_transaction_types WHERE is_active = 1`
+	rows, err := config.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []TransactionType
+	for rows.Next() {
+		var t TransactionType
+		if err := rows.Scan(&t.TransactionTypeID, &t.TransactionCode, &t.TransactionName); err == nil {
+			list = append(list, t)
+		}
+	}
+	if list == nil {
+		list = []TransactionType{}
+	}
+	return list, nil
+}
+
+type ManualLedgerEntry struct {
+	TransactionTypeID int     `json:"transaction_type_id"`
+	Qty               float64 `json:"qty"`
+	Remarks           string  `json:"remarks"`
+	ReferenceID       *int    `json:"reference_id"` // Pointer allows nulls
+	ProjectID         *int    `json:"project_id"`   // Pointer allows nulls
+	CreatedBy         string  `json:"created_by"`
+}
+
+func AddManualLedgerEntry(inventoryID int, entry ManualLedgerEntry) error {
+	tx, err := config.DB.Begin()
+	if err != nil {
+		return err
+	}
+
+	// 1. Find if this type is a deduction or addition
+	var code string
+	err = tx.QueryRow("SELECT transaction_code FROM tbl_inventory_transaction_types WHERE transaction_type_id = ?", entry.TransactionTypeID).Scan(&code)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	multiplier := 1.0
+	// If it's a manual deduction or an MRF issue, subtract the qty
+	if code == "MANUAL_SUB" || code == "MRF_ISSUE" {
+		multiplier = -1.0
+	}
+	qtyChange := entry.Qty * multiplier
+
+	// Force default remark if left empty
+	if entry.Remarks == "" {
+		entry.Remarks = "Manual adjustment via terminal"
+	}
+
+	// 2. Insert the ledger record WITH all tracking fields
+	_, err = tx.Exec(`
+        INSERT INTO tbl_inventory_ledger 
+        (inventory_id, transaction_type_id, qty_change, reference_id, project_id, destination, status, remarks, created_by) 
+        VALUES (?, ?, ?, ?, ?, 'Main Warehouse', 'Completed', ?, ?)`,
+		inventoryID, entry.TransactionTypeID, qtyChange, entry.ReferenceID, entry.ProjectID, entry.Remarks, entry.CreatedBy)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// 3. Update the master inventory quantity
+	_, err = tx.Exec(`UPDATE tbl_inventory SET qty_on_hand = qty_on_hand + ? WHERE inventory_id = ?`, qtyChange, inventoryID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func DeleteLedgerEntry(ledgerID int) error {
+	tx, err := config.DB.Begin()
+	if err != nil {
+		return err
+	}
+
+	var invID int
+	var qtyChange float64
+
+	// 1. Get the exact quantity change of the transaction
+	err = tx.QueryRow("SELECT inventory_id, qty_change FROM tbl_inventory_ledger WHERE ledger_id = ?", ledgerID).Scan(&invID, &qtyChange)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("transaction not found: %v", err)
+	}
+
+	// 2. Reverse the mathematical effect on Master Inventory
+	// If qtyChange is positive (addition), subtracting it removes it.
+	// If qtyChange is negative (deduction), subtracting a negative adds it back!
+	_, err = tx.Exec("UPDATE tbl_inventory SET qty_on_hand = qty_on_hand - ? WHERE inventory_id = ?", qtyChange, invID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// 3. Finally, delete the ledger record
+	_, err = tx.Exec("DELETE FROM tbl_inventory_ledger WHERE ledger_id = ?", ledgerID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	return tx.Commit()
 }

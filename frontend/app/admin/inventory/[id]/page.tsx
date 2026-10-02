@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Save, X, Plus, Search, ChevronDown, Edit2, Package, ClipboardCheck, Image as ImageIcon, Building2, History, Truck, Activity, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, X, Plus, Search, ChevronDown, Package, ImageIcon, Building2, Truck, Activity, Trash2, Filter, AlertTriangle, ShoppingCart } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -11,7 +11,7 @@ interface SearchableDropdownProps {
     options: any[];
     value: any;
     onChange: (val: any) => void;
-    onAddNew: (searchVal: string) => void;
+    onAddNew?: (searchVal: string) => void;
     placeholder: string;
     disabled?: boolean;
     renderItem?: (item: any) => React.ReactNode;
@@ -31,7 +31,7 @@ const SearchableDropdown = ({ options, value, onChange, onAddNew, placeholder, d
     }, []);
 
     const filteredOptions = options.filter((opt: any) => (opt.label || '').toLowerCase().includes(search.toLowerCase()));
-    const selectedOption = options.find((opt: any) => opt.value === value);
+    const selectedOption = options.find((opt: any) => String(opt.value) === String(value));
 
     return (
         <div ref={wrapperRef} className="relative w-full">
@@ -39,11 +39,13 @@ const SearchableDropdown = ({ options, value, onChange, onAddNew, placeholder, d
                 className={`w-full p-2 border rounded text-sm bg-slate-50 flex justify-between items-center cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-400'}`}
                 onClick={() => !disabled && setIsOpen(!isOpen)}
             >
-                <span className={selectedOption ? 'text-slate-800' : 'text-slate-400'}>{selectedOption ? selectedOption.label : placeholder}</span>
-                <ChevronDown className="h-4 w-4 text-slate-400" />
+                <span className={`truncate pr-2 ${selectedOption ? 'text-slate-800 font-semibold' : 'text-slate-400'}`}>
+                    {selectedOption ? selectedOption.label : placeholder}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
             </div>
 
-            {isOpen && (
+            {isOpen && !disabled && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden">
                     <div className="p-2 border-b border-slate-100">
                         <div className="relative">
@@ -54,7 +56,7 @@ const SearchableDropdown = ({ options, value, onChange, onAddNew, placeholder, d
                     <div className="max-h-48 overflow-y-auto">
                         {filteredOptions.length > 0 ? (
                             filteredOptions.map((opt: any) => (
-                                <div key={opt.value} className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700" onClick={() => { onChange(opt.value); setIsOpen(false); setSearch(''); }}>
+                                <div key={opt.value} className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700" onMouseDown={(e) => { e.preventDefault(); onChange(opt.value); setIsOpen(false); setSearch(''); }}>
                                     {renderItem ? renderItem(opt.original) : opt.label}
                                 </div>
                             ))
@@ -62,9 +64,14 @@ const SearchableDropdown = ({ options, value, onChange, onAddNew, placeholder, d
                             <div className="px-3 py-4 text-sm text-center text-slate-400">No results found.</div>
                         )}
                     </div>
-                    <div className="p-2 border-t border-slate-100 bg-slate-50 text-blue-600 font-semibold text-sm flex items-center justify-center gap-1 cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => { setIsOpen(false); onAddNew(search); setSearch(''); }}>
-                        <Plus className="h-4 w-4" /> Add New
-                    </div>
+                    {onAddNew && (
+                        <div 
+                            className="p-2 border-t border-slate-100 bg-slate-50 text-blue-600 font-semibold text-sm flex items-center justify-center gap-1 cursor-pointer hover:bg-blue-100 transition-colors" 
+                            onMouseDown={(e) => { e.preventDefault(); setIsOpen(false); onAddNew(search); setSearch(''); }}
+                        >
+                            <Plus className="h-4 w-4" /> Add New
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -76,9 +83,10 @@ export default function InventoryItemDetail() {
     const router = useRouter();
     const itemId = params.id;
 
-    const [activeTab, setActiveTab] = useState('details');
+    const [activeTab, setActiveTab] = useState('history');
     const [loading, setLoading] = useState(true);
     const [inventoryItem, setInventoryItem] = useState<any>(null);
+    const [username, setUsername] = useState('Warehouse Admin');
     
     // Left Panel Form States
     const [editForm, setEditForm] = useState({ inventory_name: '', description: '', is_active: true });
@@ -92,23 +100,35 @@ export default function InventoryItemDetail() {
     const [newAttrModalOpen, setNewAttrModalOpen] = useState(false);
     const [newAttributeForm, setNewAttributeForm] = useState({ attribute_name: '', data_type: 'string' });
     const [newClassModalOpen, setNewClassModalOpen] = useState(false);
-    const [newClassName, setNewClassName] = useState('');
+    const [newClassForm, setNewClassForm] = useState({ classification_name: '', description: '' });
 
     // Tab 2 & 3: Ledger and MRF History
     const [stockHistory, setStockHistory] = useState<any[]>([]);
     const [mrfHistory, setMrfHistory] = useState<any[]>([]);
     const [editingHistoryId, setEditingHistoryId] = useState<number | null>(null);
     const [historyEditForm, setHistoryEditForm] = useState({ qty_change: 0, remarks: '' });
+    
+    // NEW: Manual Ledger Entry States
+    const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
+    const [transactionTypes, setTransactionTypes] = useState<any[]>([]);
+    const [ledgerForm, setLedgerForm] = useState({ type_id: '', qty: '', remarks: '', reference_id: '', project_id: '' });
 
-    // Tab 4: SUPPLIER STATES (Using Bridge Table)
+    // Tab 4: SUPPLIER STATES
     const [invSuppliers, setInvSuppliers] = useState<any[]>([]);
+    const [companies, setCompanies] = useState<any[]>([]);
     const [catalogOptions, setCatalogOptions] = useState<any[]>([]);
     const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
-    
-    // Updated Form to strictly use the bridge table fields
     const [supplierForm, setSupplierForm] = useState({ supplier_product_id: '', lead_time_days: 0, moq: 1 });
 
-    useEffect(() => { if (itemId) fetchAllData(); }, [itemId]);
+    const [globalUOMs, setGlobalUOMs] = useState<any[]>([]);
+    const [createForm, setCreateForm] = useState({ dbos_code: '', inventory_name: '', description: '', uom_id: '' });
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+    useEffect(() => { 
+        const storedUser = localStorage.getItem('username');
+        if (storedUser) setUsername(storedUser);
+        if (itemId) fetchAllData(); 
+    }, [itemId]);
 
     const fetchAllData = async () => {
         try {
@@ -131,13 +151,16 @@ export default function InventoryItemDetail() {
                 setItemClassifications(mappedClasses);
 
                 // Fetch secondary data concurrently
-                const [attrRes, classRes, histRes, supRes, mrfRes, catRes] = await Promise.all([
+                const [attrRes, classRes, histRes, supRes, mrfRes, compRes, catRes, txTypesRes, uomRes] = await Promise.all([
                     fetch(`${API_URL}/api/attributes`),
                     fetch(`${API_URL}/api/classifications`),
                     fetch(`${API_URL}/api/inventory/${itemId}/ledger`),
-                    fetch(`${API_URL}/api/inventory/${itemId}/suppliers`), // Fetching mapped suppliers from bridge table
+                    fetch(`${API_URL}/api/inventory/${itemId}/suppliers`),
                     fetch(`${API_URL}/api/inventory/${itemId}/mrfs`),
-                    fetch(`${API_URL}/api/inventory/catalog/${encodeURIComponent(currentItem.dbos_code)}`) // Fetching catalog options
+                    fetch(`${API_URL}/api/companies`),
+                    fetch(`${API_URL}/api/inventory/catalog/${encodeURIComponent(currentItem.dbos_code)}`),
+                    fetch(`${API_URL}/api/transactions/types`),
+                    fetch(`${API_URL}/api/uoms`)
                 ]);
 
                 if (attrRes.ok) setGlobalAttributes(await attrRes.json());
@@ -145,9 +168,55 @@ export default function InventoryItemDetail() {
                 if (histRes.ok) setStockHistory(await histRes.json() || []);
                 if (supRes.ok) setInvSuppliers(await supRes.json() || []);
                 if (mrfRes.ok) setMrfHistory(await mrfRes.json() || []);
+                if (compRes.ok) setCompanies(await compRes.json() || []);
                 if (catRes.ok) setCatalogOptions(await catRes.json() || []);
+                if (txTypesRes.ok) setTransactionTypes(await txTypesRes.json() || []);
+                if (uomRes.ok) setGlobalUOMs(await uomRes.json() || []);
             }
         } catch (err) { console.error(err); } finally { setLoading(false); }
+    };
+
+    const handleCreateItem = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const formData = new FormData();
+        formData.append('dbos_code', createForm.dbos_code);
+        formData.append('inventory_name', createForm.inventory_name);
+        formData.append('description', createForm.description);
+        
+        // Pass every variation of the uom ID to bypass backend handler typos
+        const uomVal = String(createForm.uom_id || 1);
+        formData.append('uom_id', uomVal);
+        formData.append('uomid', uomVal);
+        formData.append('uomId', uomVal);
+        formData.append('UOMID', uomVal);
+        formData.append('UOM_ID', uomVal);
+        
+        const validAttrs = itemAttributes.filter(a => a.attribute_id && a.value);
+        const validClasses = itemClassifications.filter(c => c.classification_id).map(c => c.classification_id);
+        
+        formData.append('attributes', JSON.stringify(validAttrs));
+        formData.append('classifications', JSON.stringify(validClasses));
+        
+        formData.append('Attributes', JSON.stringify(validAttrs));
+        formData.append('Classifications', JSON.stringify(validClasses));
+
+        if (imageFile) {
+            formData.append('image', imageFile);
+            formData.append('ImagePath', imageFile.name);
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/api/inventory`, { method: 'POST', body: formData });
+            if (res.ok) {
+                setIsCreateModalOpen(false);
+                setCreateForm({ dbos_code: '', inventory_name: '', description: '', uom_id: '' });
+                setItemAttributes([{ rowId: Date.now(), attribute_id: '', data_type: '', value: '' }]);
+                setItemClassifications([{ rowId: Date.now(), classification_id: '' }]);
+                setImageFile(null);
+                fetchAllData();
+            } else { alert("DBOS Code must be unique or error occurred."); }
+        } catch (err) { alert("Error connecting to server."); }
     };
 
     const handleUpdateItem = async (e: React.FormEvent) => {
@@ -204,6 +273,32 @@ export default function InventoryItemDetail() {
     };
     const removeClassRow = (rowId: number) => setItemClassifications(prev => prev.filter(r => r.rowId !== rowId));
 
+    // --- MANUAL LEDGER LOGIC ---
+    const handleAddManualLedger = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(`${API_URL}/api/inventory/${itemId}/ledger/manual`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    transaction_type_id: parseInt(ledgerForm.type_id),
+                    qty: parseFloat(ledgerForm.qty),
+                    remarks: ledgerForm.remarks,
+                    reference_id: ledgerForm.reference_id ? parseInt(ledgerForm.reference_id) : null,
+                    project_id: ledgerForm.project_id ? parseInt(ledgerForm.project_id) : null,
+                    created_by: username
+                })
+            });
+            if (res.ok) {
+                setIsLedgerModalOpen(false);
+                setLedgerForm({ type_id: '', qty: '', remarks: '', reference_id: '', project_id: '' });
+                fetchAllData();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Failed to add transaction");
+            }
+        } catch (err) { alert("Error connecting to server."); }
+    };
+
     const handleUpdateHistoryRecord = async (ledgerID: number) => {
         try {
             const res = await fetch(`${API_URL}/api/inventory/history/${ledgerID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(historyEditForm) });
@@ -217,7 +312,24 @@ export default function InventoryItemDetail() {
         } catch (err) { alert("Error updating ledger."); }
     };
 
-    // --- SUPPLIER MAPPING HANDLERS (BRIDGE TABLE) ---
+    // DELETION LOGIC (Reverses Stock)
+    const handleDeleteLedgerEntry = async (ledgerId: number) => {
+        if (!ledgerId) return alert("Error: Missing Ledger ID from the database response.");
+        if (!confirm("Are you sure you want to delete this transaction? This will reverse the quantity change on the master inventory.")) return;
+        
+        try {
+            const res = await fetch(`${API_URL}/api/inventory/ledger/${ledgerId}`, { method: 'DELETE' });
+            if (res.ok) {
+                alert("Transaction successfully deleted and stock reversed.");
+                fetchAllData();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Failed to delete transaction");
+            }
+        } catch (err) { alert("Error connecting to server."); }
+    };
+
+    // --- SUPPLIER MAPPING HANDLERS ---
     const handleAddSupplier = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
@@ -234,7 +346,7 @@ export default function InventoryItemDetail() {
                 setIsAddSupplierOpen(false);
                 setSupplierForm({ supplier_product_id: '', lead_time_days: 0, moq: 1 });
                 fetchAllData();
-            } else alert("Failed to add supplier mapping. It might already exist.");
+            } else alert("Failed to add supplier or mapping already exists.");
         } catch (err) {}
     };
 
@@ -269,12 +381,12 @@ export default function InventoryItemDetail() {
     const handleQuickCreateClassification = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/api/classifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ classification_name: newClassName }) });
+            const res = await fetch(`${API_URL}/api/classifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClassForm) });
             if (res.ok) {
                 const newClass = await res.json();
                 setGlobalClassifications([...globalClassifications, newClass]);
                 setNewClassModalOpen(false);
-                setNewClassName('');
+                setNewClassForm({ classification_name: '', description: '' });
             }
         } catch (err) {}
     };
@@ -284,6 +396,8 @@ export default function InventoryItemDetail() {
 
     const attrOptions = globalAttributes.map(a => ({ value: a.attribute_id, label: a.attribute_name, original: a }));
     const classOptions = globalClassifications.map(c => ({ value: c.classification_id, label: c.classification_name }));
+
+    const manualTransactionOptions = transactionTypes.filter(t => !['MRF_ISSUE', 'PO_RECEIPT'].includes(t.transaction_code));
 
     return (
         <div className="bg-slate-50 min-h-screen pb-12">
@@ -343,8 +457,8 @@ export default function InventoryItemDetail() {
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full min-h-[600px]">
                         <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50/50">
                             {[
-                                { id: 'details', label: 'Other Details' },
                                 { id: 'history', label: 'Stock Ledger (History)' },
+                                { id: 'details', label: 'Other Details' },
                                 { id: 'mrfs', label: 'Material Requisitions' },
                                 { id: 'suppliers', label: 'Supplier Setup' }
                             ].map(tab => (
@@ -363,7 +477,7 @@ export default function InventoryItemDetail() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {itemClassifications.map((row, index) => (
                                                 <div key={row.rowId} className="flex gap-2 items-center">
-                                                    <SearchableDropdown placeholder={index === itemClassifications.length - 1 && itemClassifications.length > 1 ? "+ Add another tag..." : "Select Tag..."} options={classOptions} value={row.classification_id} onChange={(val: any) => handleClassSelect(row.rowId, val)} onAddNew={(searchVal: string) => { setNewClassName(searchVal); setNewClassModalOpen(true); }} />
+                                                    <SearchableDropdown placeholder={index === itemClassifications.length - 1 && itemClassifications.length > 1 ? "+ Add another tag..." : "Select Tag..."} options={classOptions} value={row.classification_id} onChange={(val: any) => handleClassSelect(row.rowId, val)} onAddNew={(searchVal: string) => { setNewClassForm({ classification_name: searchVal, description: '' }); setNewClassModalOpen(true); }} />
                                                     {row.classification_id && index !== itemClassifications.length - 1 && <button type="button" onClick={() => removeClassRow(row.rowId)} className="p-2 text-slate-400 hover:text-red-500"><X className="h-4 w-4"/></button>}
                                                 </div>
                                             ))}
@@ -393,9 +507,22 @@ export default function InventoryItemDetail() {
                                 </div>
                             )}
 
-                            {/* TAB 2: LEDGER HISTORY */}
+                            {/* TAB 2: LEDGER HISTORY (WITH MANUAL ADDITION BUTTON) */}
                             {activeTab === 'history' && (
-                                <div className="animate-in fade-in duration-200">
+                                <div className="animate-in fade-in duration-200 space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h3 className="font-bold text-slate-800">Master Stock Ledger</h3>
+                                            <p className="text-xs text-slate-500 mt-0.5">A complete audit trail of every movement for this material.</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => setIsLedgerModalOpen(true)}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                        >
+                                            <Plus className="h-4 w-4" /> Add Transaction
+                                        </button>
+                                    </div>
+
                                     <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                                         <table className="w-full text-left text-sm">
                                             <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
@@ -403,13 +530,14 @@ export default function InventoryItemDetail() {
                                                     <th className="p-4 font-bold">Date & Time</th>
                                                     <th className="p-4 font-bold">Transaction Type</th>
                                                     <th className="p-4 text-center font-bold">Qty Change</th>
-                                                    <th className="p-4 font-bold">Location</th>
-                                                    <th className="p-4 font-bold">Reference / Remarks</th>
+                                                    <th className="p-4 font-bold">Remarks</th>
+                                                    <th className="p-4 font-bold">User</th>
+                                                    <th className="p-4 font-bold text-center">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
                                                 {stockHistory.length === 0 ? (
-                                                    <tr><td colSpan={5} className="p-12 text-center text-slate-400 italic">No ledger history recorded for this item yet.</td></tr>
+                                                    <tr><td colSpan={6} className="p-12 text-center text-slate-400 italic">No ledger history recorded for this item yet.</td></tr>
                                                 ) : stockHistory.map((h, idx) => (
                                                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                                         <td className="p-4 text-slate-600 whitespace-nowrap">{h.created_at}</td>
@@ -421,8 +549,17 @@ export default function InventoryItemDetail() {
                                                         <td className={`p-4 text-center font-bold text-base ${h.qty_change > 0 ? 'text-emerald-600' : h.qty_change < 0 ? 'text-red-600' : 'text-slate-600'}`}>
                                                             {h.qty_change > 0 ? '+' : ''}{h.qty_change}
                                                         </td>
-                                                        <td className="p-4 text-slate-600 text-sm font-medium">{h.destination}</td>
                                                         <td className="p-4 text-slate-500 text-sm italic">{h.remarks || <span className="text-slate-300">No remarks</span>}</td>
+                                                        <td className="p-4 text-slate-600 text-sm font-medium">{h.created_by || <span className="text-slate-400 italic">System</span>}</td>
+                                                        <td className="p-4 text-center">
+                                                            <button 
+                                                                onClick={() => handleDeleteLedgerEntry(h.ledger_id)} 
+                                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" 
+                                                                title="Delete Transaction & Reverse Stock"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -579,9 +716,94 @@ export default function InventoryItemDetail() {
                 </div>
             </div>
 
-            {/* Quick Create Modals */}
+            {/* MANUAL LEDGER TRANSACTION MODAL */}
+            {isLedgerModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-5 bg-blue-600 text-white flex justify-between items-center shrink-0">
+                            <div>
+                                <h3 className="font-bold text-lg flex items-center gap-2"><Plus className="h-5 w-5" /> Record Transaction</h3>
+                            </div>
+                            <button onClick={() => setIsLedgerModalOpen(false)} className="hover:text-blue-200 transition-colors p-1"><X className="h-6 w-6" /></button>
+                        </div>
+                        <form onSubmit={handleAddManualLedger} className="p-6 space-y-5 bg-slate-50">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Transaction Type *</label>
+                                <select 
+                                    required 
+                                    value={ledgerForm.type_id} 
+                                    onChange={e => setLedgerForm({...ledgerForm, type_id: e.target.value})} 
+                                    className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-semibold outline-none focus:border-blue-500 bg-white"
+                                >
+                                    <option value="" disabled>Select Type...</option>
+                                    {manualTransactionOptions.map(t => (
+                                        <option key={t.transaction_type_id} value={t.transaction_type_id}>{t.transaction_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Physical Quantity *</label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    min="0.01"
+                                    required 
+                                    value={ledgerForm.qty} 
+                                    onChange={e => setLedgerForm({...ledgerForm, qty: e.target.value})} 
+                                    className="w-full p-3 border border-slate-300 rounded-lg text-lg font-bold text-center outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" 
+                                    placeholder="Enter physical amount..." 
+                                />
+                                <div className="text-[10px] text-slate-400 italic text-center">System handles addition/deduction based on transaction type. Enter positive amounts only.</div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Reference ID (Optional)</label>
+                                    <input 
+                                        type="number" 
+                                        value={ledgerForm.reference_id} 
+                                        onChange={e => setLedgerForm({...ledgerForm, reference_id: e.target.value})} 
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" 
+                                        placeholder="e.g., Doc #" 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Project ID (Optional)</label>
+                                    <input 
+                                        type="number" 
+                                        value={ledgerForm.project_id} 
+                                        onChange={e => setLedgerForm({...ledgerForm, project_id: e.target.value})} 
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" 
+                                        placeholder="e.g., 102" 
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Remarks / Notes</label>
+                                <textarea 
+                                    value={ledgerForm.remarks} 
+                                    onChange={e => setLedgerForm({...ledgerForm, remarks: e.target.value})} 
+                                    className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500 resize-none h-20" 
+                                    placeholder="Optional notes regarding this adjustment..." 
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                                <button type="button" onClick={() => setIsLedgerModalOpen(false)} className="px-5 py-2.5 text-slate-600 bg-white border border-slate-300 rounded-lg font-bold">Cancel</button>
+                                <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 flex items-center gap-2">
+                                    <Save className="h-4 w-4"/> Record Entry
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick Create Modals with elevated z-[100] */}
             {newAttrModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/70 z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-4 bg-slate-800 text-white flex justify-between items-center"><h3 className="font-bold">New Attribute</h3><button onClick={() => setNewAttrModalOpen(false)}><X className="h-4 w-4"/></button></div>
                         <form onSubmit={handleQuickCreateAttribute} className="p-5 space-y-4">
@@ -599,11 +821,18 @@ export default function InventoryItemDetail() {
             )}
 
             {newClassModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/70 z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-4 bg-slate-800 text-white flex justify-between items-center"><h3 className="font-bold">New Tag / Classification</h3><button onClick={() => setNewClassModalOpen(false)}><X className="h-4 w-4"/></button></div>
                         <form onSubmit={handleQuickCreateClassification} className="p-5 space-y-4">
-                            <div><label className="block text-xs font-bold mb-1 text-slate-600">Tag Name</label><input required autoFocus value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="e.g. Flammable, Summer Collection" className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" /></div>
+                            <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-600">Tag Name *</label>
+                                <input required autoFocus value={newClassForm.classification_name} onChange={e => setNewClassForm({...newClassForm, classification_name: e.target.value})} placeholder="e.g. Flammable, Summer Collection" className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-600">Description</label>
+                                <input value={newClassForm.description} onChange={e => setNewClassForm({...newClassForm, description: e.target.value})} placeholder="Optional description..." className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" />
+                            </div>
                             <div className="pt-2"><button type="submit" className="w-full py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700">Create Tag</button></div>
                         </form>
                     </div>

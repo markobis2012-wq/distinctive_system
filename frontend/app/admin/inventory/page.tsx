@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Package, Plus, Search, ArrowLeft, X, Save, Edit2, History, Image as ImageIcon, Eye, Trash2, ChevronDown, Filter, AlertTriangle, ShoppingCart, Building2, Truck, Activity } from 'lucide-react';
+import { ArrowLeft, Save, X, Plus, Search, ChevronDown, Package, ImageIcon, Building2, Truck, Activity, Trash2, Filter, AlertTriangle, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -25,7 +25,7 @@ const SearchableDropdown = ({ options, value, onChange, onAddNew, placeholder, d
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) setIsOpen(false);
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) { setIsOpen(false); }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -36,7 +36,10 @@ const SearchableDropdown = ({ options, value, onChange, onAddNew, placeholder, d
 
     return (
         <div ref={wrapperRef} className="relative w-full">
-            <div className={`w-full p-2 border rounded text-sm bg-slate-50 flex justify-between items-center cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-400'}`} onClick={() => !disabled && setIsOpen(!isOpen)}>
+            <div 
+                className={`w-full p-2 border rounded text-sm bg-slate-50 flex justify-between items-center cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-400'}`}
+                onClick={() => !disabled && setIsOpen(!isOpen)}
+            >
                 <span className={`truncate pr-2 ${selectedOption ? 'text-slate-800 font-semibold' : 'text-slate-400'}`}>
                     {selectedOption ? selectedOption.label : placeholder}
                 </span>
@@ -54,7 +57,7 @@ const SearchableDropdown = ({ options, value, onChange, onAddNew, placeholder, d
                     <div className="max-h-48 overflow-y-auto">
                         {filteredOptions.length > 0 ? (
                             filteredOptions.map((opt: any) => (
-                                <div key={opt.value} className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700" onClick={() => { onChange(opt.value); setIsOpen(false); setSearch(''); }}>
+                                <div key={opt.value} className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 hover:text-blue-700" onMouseDown={(e) => { e.preventDefault(); onChange(opt.value); setIsOpen(false); setSearch(''); }}>
                                     {renderItem ? renderItem(opt.original) : opt.label}
                                 </div>
                             ))
@@ -63,7 +66,10 @@ const SearchableDropdown = ({ options, value, onChange, onAddNew, placeholder, d
                         )}
                     </div>
                     {onAddNew && (
-                        <div className="p-2 border-t border-slate-100 bg-slate-50 text-blue-600 font-semibold text-sm flex items-center justify-center gap-1 cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => { setIsOpen(false); onAddNew(search); setSearch(''); }}>
+                        <div 
+                            className="p-2 border-t border-slate-100 bg-slate-50 text-blue-600 font-semibold text-sm flex items-center justify-center gap-1 cursor-pointer hover:bg-blue-100 transition-colors" 
+                            onMouseDown={(e) => { e.preventDefault(); setIsOpen(false); onAddNew(search); setSearch(''); }}
+                        >
                             <Plus className="h-4 w-4" /> Add New
                         </div>
                     )}
@@ -76,7 +82,6 @@ const SearchableDropdown = ({ options, value, onChange, onAddNew, placeholder, d
 export default function InventoryPage() {
     const router = useRouter();
 
-    // MRF Notification States
     const [pendingMRFs, setPendingMRFs] = useState<any[]>([]);
     const [isMRFPanelOpen, setIsMRFPanelOpen] = useState(false);
     const [selectedMRF, setSelectedMRF] = useState<any>(null);
@@ -84,35 +89,29 @@ export default function InventoryPage() {
     const [username, setUsername] = useState('Warehouse Admin');
     const [issueDestination, setIssueDestination] = useState('Production Floor'); 
 
-    // Inventory States
     const [inventory, setInventory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // --- FILTER STATES ---
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+    const [filterName, setFilterName] = useState('');
+    const [filterDescription, setFilterDescription] = useState('');
     const [filterClassifications, setFilterClassifications] = useState<any[]>([{ rowId: Date.now(), classification_id: '' }]);
     const [filterAttributes, setFilterAttributes] = useState<any[]>([{ rowId: Date.now() + 1, attribute_id: '', value: '' }]);
 
-    // --- ATTRIBUTE & UOM STATES ---
     const [globalAttributes, setGlobalAttributes] = useState<any[]>([]);
     const [newAttributeForm, setNewAttributeForm] = useState({ attribute_name: '', data_type: 'string' });
     const [globalUOMs, setGlobalUOMs] = useState<any[]>([]);
 
-    // --- CLASSIFICATION STATES ---
     const [globalClassifications, setGlobalClassifications] = useState<any[]>([]);
     const [newClassModalOpen, setNewClassModalOpen] = useState(false);
-    const [newClassName, setNewClassName] = useState('');
+    const [newClassForm, setNewClassForm] = useState({ classification_name: '', description: '' });
     const [newAttrModalOpen, setNewAttrModalOpen] = useState(false);
 
-    // --- DYNAMIC ROWS STATE ---
     const [itemAttributes, setItemAttributes] = useState<any[]>([{ rowId: Date.now(), attribute_id: '', data_type: '', value: '' }]);
     const [itemClassifications, setItemClassifications] = useState<any[]>([{ rowId: Date.now(), classification_id: '' }]);
 
-    // Modals
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    
-    // Forms
     const [createForm, setCreateForm] = useState({ dbos_code: '', inventory_name: '', description: '', uom_id: '' });
     const [imageFile, setImageFile] = useState<File | null>(null);
 
@@ -154,29 +153,69 @@ export default function InventoryPage() {
     useEffect(() => {
         const storedUser = localStorage.getItem('username');
         if (storedUser) setUsername(storedUser);
-        
-        fetchInventory();
-        fetchPendingMRFs();
-        fetchAttributes();
-        fetchClassifications();
-        fetchUOMs();
+        fetchInventory(); fetchPendingMRFs(); fetchAttributes(); fetchClassifications(); fetchUOMs();
     }, []);
 
-    // --- CREATE HANDLERS ---
+    const handleAttrSelect = (rowId: number, attributeId: number) => {
+        setItemAttributes(prev => {
+            const updated = [...prev];
+            const index = updated.findIndex(r => r.rowId === rowId);
+            const selectedAttr = globalAttributes.find(a => a.attribute_id === attributeId);
+            if (index >= 0 && selectedAttr) {
+                updated[index] = { ...updated[index], attribute_id: attributeId, data_type: selectedAttr.data_type };
+                if (index === updated.length - 1) updated.push({ rowId: Date.now(), attribute_id: '', data_type: '', value: '' });
+            }
+            return updated;
+        });
+    };
+    const handleAttrValueChange = (rowId: number, value: string) => setItemAttributes(prev => prev.map(row => row.rowId === rowId ? { ...row, value } : row));
+    const removeAttrRow = (rowId: number) => setItemAttributes(prev => prev.filter(r => r.rowId !== rowId));
+
+    const handleClassSelect = (rowId: number, classId: number) => {
+        setItemClassifications(prev => {
+            const updated = [...prev];
+            const index = updated.findIndex(r => r.rowId === rowId);
+            if (index >= 0) {
+                updated[index] = { ...updated[index], classification_id: classId };
+                if (index === updated.length - 1) updated.push({ rowId: Date.now(), classification_id: '' });
+            }
+            return updated;
+        });
+    };
+    const removeClassRow = (rowId: number) => setItemClassifications(prev => prev.filter(r => r.rowId !== rowId));
+
     const handleCreateItem = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        console.log("====== FRONTEND SUBMISSION LOG (INVENTORY PAGE) ======");
+        console.log("1. Raw createForm state:", createForm);
+        console.log("2. Value of createForm.uom_id:", createForm.uom_id);
+        console.log("3. Type of createForm.uom_id:", typeof createForm.uom_id);
+
         const formData = new FormData();
         formData.append('dbos_code', createForm.dbos_code);
         formData.append('inventory_name', createForm.inventory_name);
         formData.append('description', createForm.description);
-        formData.append('uom_id', createForm.uom_id);
+        
+        const uomVal = String(createForm.uom_id); 
+        console.log("4. uomVal being appended to FormData:", uomVal);
+
+        formData.append('uom_id', uomVal);
+        formData.append('uomid', uomVal);
+        formData.append('uomId', uomVal);
+        formData.append('UOMID', uomVal);
+        formData.append('UOM_ID', uomVal);
         
         const validAttrs = itemAttributes.filter(a => a.attribute_id && a.value);
         const validClasses = itemClassifications.filter(c => c.classification_id).map(c => c.classification_id);
         
         formData.append('attributes', JSON.stringify(validAttrs));
         formData.append('classifications', JSON.stringify(validClasses));
-        if (imageFile) formData.append('image', imageFile);
+
+        if (imageFile) {
+            formData.append('image', imageFile);
+            formData.append('ImagePath', imageFile.name);
+        }
 
         try {
             const res = await fetch(`${API_URL}/api/inventory`, { method: 'POST', body: formData });
@@ -186,17 +225,48 @@ export default function InventoryPage() {
                 setItemAttributes([{ rowId: Date.now(), attribute_id: '', data_type: '', value: '' }]);
                 setItemClassifications([{ rowId: Date.now(), classification_id: '' }]);
                 setImageFile(null);
-                fetchInventory();
                 
+                // Specific to InventoryPage
+                fetchInventory();
+
                 if (selectedMRF) {
                     const latestInv = await (await fetch(`${API_URL}/api/inventory`)).json();
                     setInventory(latestInv);
                 }
-            } else { alert("DBOS Code must be unique or error occurred."); }
-        } catch (err) { alert("Error connecting to server."); }
+            } else { 
+                alert("DBOS Code must be unique or error occurred."); 
+            }
+        } catch (err) { 
+            alert("Error connecting to server."); 
+        }
     };
 
-    // --- MRF FULFILLMENT HANDLERS ---
+    const handleQuickCreateAttribute = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(`${API_URL}/api/attributes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAttributeForm) });
+            if (res.ok) {
+                const newAttr = await res.json();
+                setGlobalAttributes([...globalAttributes, newAttr]);
+                setNewAttrModalOpen(false);
+                setNewAttributeForm({ attribute_name: '', data_type: 'string' });
+            }
+        } catch (err) {}
+    };
+
+    const handleQuickCreateClassification = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(`${API_URL}/api/classifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClassForm) });
+            if (res.ok) {
+                const newClass = await res.json();
+                setGlobalClassifications([...globalClassifications, newClass]);
+                setNewClassModalOpen(false);
+                setNewClassForm({ classification_name: '', description: '' });
+            }
+        } catch (err) {}
+    };
+
     const openMRFFulfillment = async (mrf: any) => {
         setSelectedMRF(mrf);
         setIssueDestination('Production Floor');
@@ -244,34 +314,38 @@ export default function InventoryPage() {
         } catch (err) { alert("Error fulfilling MRF"); }
     };
 
-    // --- DYNAMIC SEARCH & FILTER ---
     const activeClassFiltersCount = filterClassifications.filter(f => f.classification_id !== '').length;
     const activeAttrFiltersCount = filterAttributes.filter(f => f.attribute_id !== '').length;
-    const totalActiveFilters = activeClassFiltersCount + activeAttrFiltersCount;
+    const totalActiveFilters = activeClassFiltersCount + activeAttrFiltersCount + (filterName ? 1 : 0) + (filterDescription ? 1 : 0);
 
     const filteredInventory = inventory?.filter(item => {
         const term = searchTerm.toLowerCase();
-        const matchesMain = item.inventory_name.toLowerCase().includes(term) || item.dbos_code.toLowerCase().includes(term);
-        const matchesAttr = item.attributes?.some((attr: any) => attr.value?.toLowerCase().includes(term));
-        const passesSearch = term === '' || matchesMain || matchesAttr;
+        const matchesMain = item.inventory_name.toLowerCase().includes(term) || 
+                            item.dbos_code.toLowerCase().includes(term) ||
+                            (item.description && item.description.toLowerCase().includes(term));
+        const matchesAttrSearch = item.attributes?.some((attr: any) => attr.value?.toLowerCase().includes(term));
+        const passesSearch = term === '' || matchesMain || matchesAttrSearch;
+
+        const passesFilterName = filterName === '' || item.inventory_name.toLowerCase().includes(filterName.toLowerCase());
+        const passesFilterDesc = filterDescription === '' || (item.description && item.description.toLowerCase().includes(filterDescription.toLowerCase()));
 
         const validClassFilters = filterClassifications.filter(f => f.classification_id !== '');
         let passesClass = true;
         if (validClassFilters.length > 0) {
-            passesClass = validClassFilters.every(filter => item.classifications?.some((c: any) => c.classification_id.toString() === filter.classification_id.toString()));
+            passesClass = validClassFilters.every(filter => item.classifications?.some((c: any) => String(c.classification_id) === String(filter.classification_id)));
         }
 
         const validAttrFilters = filterAttributes.filter(f => f.attribute_id !== '');
         let passesAttr = true;
         if (validAttrFilters.length > 0) {
             passesAttr = validAttrFilters.every(filter => {
-                const attrNode = item.attributes?.find((a: any) => a.attribute_id.toString() === filter.attribute_id.toString());
+                const attrNode = item.attributes?.find((a: any) => String(a.attribute_id) === String(filter.attribute_id));
                 if (!attrNode) return false;
-                if (filter.value !== '') return attrNode.value.toLowerCase().includes(filter.value.toLowerCase());
+                if (filter.value !== '') return (attrNode.value || '').toLowerCase().includes(filter.value.toLowerCase());
                 return true;
             });
         }
-        return passesSearch && passesClass && passesAttr;
+        return passesSearch && passesFilterName && passesFilterDesc && passesClass && passesAttr;
     }) || [];
 
     const attrOptions = globalAttributes.map(a => ({ value: a.attribute_id, label: a.attribute_name, original: a }));
@@ -350,7 +424,7 @@ export default function InventoryPage() {
                             <div className="flex w-full sm:w-auto gap-2 flex-1">
                                 <div className="relative flex-1 max-w-md">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                    <input type="text" placeholder="Search by name, code, attributes, or tags..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" />
+                                    <input type="text" placeholder="Search by name, code, description, or tags..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" />
                                 </div>
                                 <button 
                                     onClick={() => setIsFilterModalOpen(true)} 
@@ -438,8 +512,11 @@ export default function InventoryPage() {
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-right font-bold text-lg text-slate-800">
-                                            {item.qty_on_hand}
+                                        <td className="px-6 py-4 text-right">
+                                            <span className="font-bold text-lg text-slate-800">{item.qty_on_hand}</span>
+                                            <span className="text-xs text-slate-500 ml-1.5 font-medium uppercase">
+                                                {globalUOMs.find(u => String(u.uom_id) === String(item.uom_id))?.uom_abbr || 'UNIT'}
+                                            </span>
                                         </td>
                                     </tr>
                                 ))}
@@ -449,9 +526,110 @@ export default function InventoryPage() {
                 </div>
             </div>
 
-            {/* --- MODALS --- */}
+            {/* RESTORED: FILTER MODAL */}
+            {isFilterModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                        <div className="p-4 bg-slate-800 flex justify-between items-center text-white shrink-0">
+                            <h3 className="font-bold flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Inventory</h3>
+                            <button onClick={() => setIsFilterModalOpen(false)}><X className="h-5 w-5"/></button>
+                        </div>
+                        <div className="overflow-y-auto flex-1 p-6 space-y-6 bg-slate-50">
+                            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">Basic Information</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Item Name</label>
+                                        <input type="text" value={filterName} onChange={e => setFilterName(e.target.value)} placeholder="Contains..." className="w-full p-2 text-sm border border-slate-300 rounded outline-none focus:border-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Description</label>
+                                        <input type="text" value={filterDescription} onChange={e => setFilterDescription(e.target.value)} placeholder="Contains..." className="w-full p-2 text-sm border border-slate-300 rounded outline-none focus:border-blue-500" />
+                                    </div>
+                                </div>
+                            </div>
 
-            {/* THE MRF FULFILLMENT MODAL (INDUSTRY STANDARD) */}
+                            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">Filter by Classifications / Tags</h4>
+                                <div className="space-y-3">
+                                    {filterClassifications.map((row, index) => (
+                                        <div key={row.rowId} className="flex gap-2 items-center">
+                                            <SearchableDropdown 
+                                                placeholder="Select Tag..."
+                                                options={classOptions} 
+                                                value={row.classification_id}
+                                                onChange={(val: any) => {
+                                                    const updated = [...filterClassifications];
+                                                    updated[index].classification_id = val;
+                                                    if (index === updated.length - 1 && val) updated.push({ rowId: Date.now(), classification_id: '' });
+                                                    setFilterClassifications(updated);
+                                                }}
+                                            />
+                                            {row.classification_id && (
+                                                <button type="button" onClick={() => {
+                                                    const filtered = filterClassifications.filter(r => r.rowId !== row.rowId);
+                                                    setFilterClassifications(filtered.length ? filtered : [{ rowId: Date.now(), classification_id: '' }]);
+                                                }} className="p-2 text-slate-400 hover:text-red-500"><X className="h-4 w-4"/></button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">Filter by Specifications</h4>
+                                <div className="space-y-3">
+                                    {filterAttributes.map((row, index) => (
+                                        <div key={row.rowId} className="flex gap-2 items-start bg-slate-50 p-3 rounded border border-slate-100">
+                                            <div className="w-1/2">
+                                                <SearchableDropdown 
+                                                    placeholder="Select Spec..." 
+                                                    options={attrOptions} 
+                                                    value={row.attribute_id} 
+                                                    onChange={(val: any) => {
+                                                        const updated = [...filterAttributes];
+                                                        updated[index].attribute_id = val;
+                                                        if (index === updated.length - 1 && val) updated.push({ rowId: Date.now(), attribute_id: '', value: '' });
+                                                        setFilterAttributes(updated);
+                                                    }} 
+                                                    renderItem={(attr: any) => (<div><div>{attr.attribute_name}</div><div className="text-[10px] text-slate-400 uppercase font-bold">{attr.data_type}</div></div>)} 
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                {row.attribute_id ? (
+                                                    <input type="text" placeholder="Value (Leave blank for any)" value={row.value || ''} onChange={e => {
+                                                        const updated = [...filterAttributes];
+                                                        updated[index].value = e.target.value;
+                                                        setFilterAttributes(updated);
+                                                    }} className="w-full p-2 border rounded text-sm bg-white outline-none focus:border-blue-500" />
+                                                ) : <input disabled value="" placeholder="Select spec first" className="w-full p-2 border border-dashed border-slate-200 rounded text-sm bg-slate-50 text-slate-400 cursor-not-allowed" />}
+                                            </div>
+                                            {row.attribute_id && (
+                                                <button type="button" onClick={() => {
+                                                    const filtered = filterAttributes.filter(r => r.rowId !== row.rowId);
+                                                    setFilterAttributes(filtered.length ? filtered : [{ rowId: Date.now() + 1, attribute_id: '', value: '' }]);
+                                                }} className="p-2 text-slate-400 hover:text-red-500 mt-0.5"><X className="h-4 w-4"/></button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                        </div>
+                        <div className="p-4 border-t border-slate-200 bg-white flex justify-between items-center shrink-0">
+                            <button type="button" onClick={() => {
+                                setFilterClassifications([{ rowId: Date.now(), classification_id: '' }]);
+                                setFilterAttributes([{ rowId: Date.now() + 1, attribute_id: '', value: '' }]);
+                                setFilterName('');
+                                setFilterDescription('');
+                            }} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded font-medium transition-colors">Clear Filters</button>
+                            <button type="button" onClick={() => setIsFilterModalOpen(false)} className="px-6 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 shadow-sm">Apply Filters</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MRF FULFILLMENT MODAL */}
             {selectedMRF && (
                 <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh]">
@@ -463,7 +641,6 @@ export default function InventoryPage() {
                             <button onClick={() => setSelectedMRF(null)} className="hover:text-blue-200 transition-colors"><X className="h-6 w-6" /></button>
                         </div>
                         
-                        {/* --- NEW DESTINATION SELECTOR --- */}
                         <div className="bg-blue-50 px-6 py-3 border-b border-blue-100 flex items-center gap-4">
                             <label className="text-sm font-bold text-blue-800 uppercase">Route Materials To:</label>
                             <select 
@@ -495,8 +672,6 @@ export default function InventoryPage() {
 
                                             return (
                                                 <tr key={item.mrf_item_id} className={`border-b border-slate-100 ${isCustom ? 'bg-orange-50/50' : item.qty_on_hand < item.qty_requested ? 'bg-red-50/50' : 'hover:bg-slate-50'}`}>
-                                                    
-                                                    {/* MAPPING COLUMN */}
                                                     <td className="px-4 py-4">
                                                         {isCustom ? (
                                                             <div className="space-y-2">
@@ -505,7 +680,6 @@ export default function InventoryPage() {
                                                                 </div>
                                                                 <div className="font-semibold text-slate-800">"{item.custom_item_name}"</div>
                                                                 
-                                                                {/* Mapping Action with Explicit Button */}
                                                                 <div className="pt-2 border-t border-orange-200/50">
                                                                     <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Map to master inventory:</label>
                                                                     <div className="flex flex-col gap-2">
@@ -560,7 +734,6 @@ export default function InventoryPage() {
                                                         {isCustom ? '?' : item.qty_on_hand}
                                                     </td>
 
-                                                    {/* ISSUE COLUMN & PO ROUTING */}
                                                     <td className="px-4 py-4 text-center">
                                                         {isCustom ? (
                                                             <span className="text-xs text-orange-600 font-bold bg-orange-100 px-2 py-1 rounded">Map item first</span>
@@ -571,14 +744,12 @@ export default function InventoryPage() {
                                                                     value={item.qty_issued} 
                                                                     onChange={(e) => {
                                                                         const newItems = [...mrfItems];
-                                                                        // Cannot issue more than what's on hand, and cannot issue more than requested
                                                                         const val = Math.min(parseFloat(e.target.value) || 0, item.qty_on_hand, item.qty_requested);
                                                                         newItems[index].qty_issued = val;
                                                                         setMrfItems(newItems);
                                                                     }}
                                                                     className={`w-24 p-2 border-2 rounded text-center font-bold outline-none focus:ring-2 ${item.qty_on_hand < item.qty_requested ? 'border-red-300 focus:ring-red-200' : 'border-emerald-300 focus:ring-emerald-200'}`} 
                                                                 />
-                                                                {/* PO SHORTAGE BADGE */}
                                                                 {shortage > 0 && (
                                                                     <div className="text-[10px] font-bold text-red-600 bg-red-100 border border-red-200 px-2 py-0.5 rounded mt-1 flex items-center gap-1 w-max mx-auto">
                                                                         <ShoppingCart className="h-3 w-3" /> To PO: {shortage.toFixed(2)}
@@ -605,7 +776,7 @@ export default function InventoryPage() {
                 </div>
             )}
 
-            {/* CREATE INVENTORY MODAL (WITH UOM DROPDOWN) */}
+            {/* CREATE INVENTORY MODAL */}
             {isCreateModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -621,10 +792,9 @@ export default function InventoryPage() {
                                         <div><label className="block text-sm font-semibold mb-1">DBOS Code *</label><input required value={createForm.dbos_code} onChange={e => setCreateForm({...createForm, dbos_code: e.target.value})} className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" /></div>
                                         <div><label className="block text-sm font-semibold mb-1">Item Name *</label><input required value={createForm.inventory_name} onChange={e => setCreateForm({...createForm, inventory_name: e.target.value})} className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" /></div>
                                         
-                                        {/* NEW: Unit of Measure Dropdown */}
                                         <div>
                                             <label className="block text-sm font-semibold mb-1">Unit of Measure *</label>
-                                            <select required value={createForm.uom_id} onChange={e => setCreateForm({...createForm, uom_id: e.target.value})} className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500 bg-white">
+                                            <select required value={createForm.uom_id || ""} onChange={e => setCreateForm({...createForm, uom_id: e.target.value})} className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500 bg-white">
                                                 <option value="" disabled>Select Unit of Measure</option>
                                                 {globalUOMs.map((uom: any) => (
                                                     <option key={uom.uom_id} value={uom.uom_id}>{uom.uom_name} ({uom.uom_abbr})</option>
@@ -643,18 +813,48 @@ export default function InventoryPage() {
                                                         <SearchableDropdown 
                                                             placeholder={index === itemClassifications.length - 1 && itemClassifications.length > 1 ? "+ Add another tag..." : "Select Tag..."}
                                                             options={classOptions} value={row.classification_id}
-                                                            onChange={(val: any) => {
-                                                                const updated = [...itemClassifications];
-                                                                updated[index].classification_id = val;
-                                                                if (index === updated.length - 1) updated.push({ rowId: Date.now(), classification_id: '' });
-                                                                setItemClassifications(updated);
-                                                            }}
-                                                            onAddNew={(val) => { setNewClassName(val); setNewClassModalOpen(true); }}
+                                                            onChange={(val: any) => handleClassSelect(row.rowId, val)}
+                                                            onAddNew={(val) => { setNewClassForm({ classification_name: val, description: '' }); setNewClassModalOpen(true); }}
                                                         />
+                                                        {row.classification_id && index !== itemClassifications.length - 1 && (
+                                                            <button type="button" onClick={() => removeClassRow(row.rowId)} className="p-2 text-slate-400 hover:text-red-500"><X className="h-4 w-4"/></button>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
+                                        
+                                        <div>
+                                            <h4 className="font-bold text-slate-800 border-b pb-2 mb-3">Technical Specifications</h4>
+                                            <div className="space-y-3">
+                                                {itemAttributes.map((row, index) => (
+                                                    <div key={row.rowId} className="flex gap-2 items-start bg-slate-50 p-3 rounded border border-slate-100">
+                                                        <div className="w-1/2">
+                                                            <SearchableDropdown 
+                                                                placeholder={index === itemAttributes.length - 1 && itemAttributes.length > 1 ? "+ Add spec..." : "Select Spec..."} 
+                                                                options={attrOptions} 
+                                                                value={row.attribute_id} 
+                                                                onChange={(val: any) => handleAttrSelect(row.rowId, val)} 
+                                                                onAddNew={(searchVal: string) => { setNewAttributeForm({...newAttributeForm, attribute_name: searchVal}); setNewAttrModalOpen(true); }} 
+                                                                renderItem={(attr: any) => (<div><div>{attr.attribute_name}</div><div className="text-[10px] text-slate-400 uppercase font-bold">{attr.data_type}</div></div>)} 
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            {row.attribute_id ? (
+                                                                row.data_type === 'boolean' ? <select value={row.value || ''} onChange={e => handleAttrValueChange(row.rowId, e.target.value)} className="w-full p-2 border rounded text-sm bg-white outline-none focus:border-blue-500"><option value="">N/A</option><option value="Yes">Yes</option><option value="No">No</option></select>
+                                                                : row.data_type === 'integer' || row.data_type === 'decimal' ? <input type="number" step={row.data_type === 'decimal' ? '0.01' : '1'} placeholder="Value" value={row.value || ''} onChange={e => handleAttrValueChange(row.rowId, e.target.value)} className="w-full p-2 border rounded text-sm bg-white outline-none focus:border-blue-500" />
+                                                                : row.data_type === 'date' ? <input type="date" value={row.value || ''} onChange={e => handleAttrValueChange(row.rowId, e.target.value)} className="w-full p-2 border rounded text-sm bg-white outline-none focus:border-blue-500" />
+                                                                : <input type="text" placeholder="Value" value={row.value || ''} onChange={e => handleAttrValueChange(row.rowId, e.target.value)} className="w-full p-2 border rounded text-sm bg-white outline-none focus:border-blue-500" />
+                                                            ) : <input disabled value="" placeholder="Select spec first" className="w-full p-2 border border-dashed border-slate-200 rounded text-sm bg-slate-50 text-slate-400 cursor-not-allowed" />}
+                                                        </div>
+                                                        {row.attribute_id && index !== itemAttributes.length - 1 && (
+                                                            <button type="button" onClick={() => removeAttrRow(row.rowId)} className="p-2 text-slate-400 hover:text-red-500 mt-0.5"><X className="h-4 w-4"/></button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
                                     </div>
                                 </div>
                             </form>
@@ -663,6 +863,44 @@ export default function InventoryPage() {
                             <button type="button" onClick={() => { setIsCreateModalOpen(false); }} className="px-5 py-2 border rounded font-medium hover:bg-white transition-colors">Cancel</button>
                             <button type="submit" form="inventoryForm" className="px-6 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 shadow-sm">Save Inventory Item</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick Create Modals with elevated z-[100] */}
+            {newAttrModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 bg-slate-800 text-white flex justify-between items-center"><h3 className="font-bold">New Attribute</h3><button onClick={() => setNewAttrModalOpen(false)}><X className="h-4 w-4"/></button></div>
+                        <form onSubmit={handleQuickCreateAttribute} className="p-5 space-y-4">
+                            <div><label className="block text-xs font-bold mb-1 text-slate-600">Attribute Name</label><input required autoFocus value={newAttributeForm.attribute_name} onChange={e => setNewAttributeForm({...newAttributeForm, attribute_name: e.target.value})} className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" /></div>
+                            <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-600">Data Type</label>
+                                <select value={newAttributeForm.data_type} onChange={e => setNewAttributeForm({...newAttributeForm, data_type: e.target.value})} className="w-full p-2 text-sm border rounded outline-none">
+                                    <option value="string">Text</option><option value="integer">Whole Number</option><option value="decimal">Decimal</option><option value="boolean">Yes/No</option><option value="date">Date</option>
+                                </select>
+                            </div>
+                            <div className="pt-2"><button type="submit" className="w-full py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700">Create Attribute</button></div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {newClassModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 bg-slate-800 text-white flex justify-between items-center"><h3 className="font-bold">New Tag / Classification</h3><button onClick={() => setNewClassModalOpen(false)}><X className="h-4 w-4"/></button></div>
+                        <form onSubmit={handleQuickCreateClassification} className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-600">Tag Name *</label>
+                                <input required autoFocus value={newClassForm.classification_name} onChange={e => setNewClassForm({...newClassForm, classification_name: e.target.value})} placeholder="e.g. Flammable, Summer Collection" className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-600">Description</label>
+                                <input value={newClassForm.description} onChange={e => setNewClassForm({...newClassForm, description: e.target.value})} placeholder="Optional description..." className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" />
+                            </div>
+                            <div className="pt-2"><button type="submit" className="w-full py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700">Create Tag</button></div>
+                        </form>
                     </div>
                 </div>
             )}
@@ -675,9 +913,10 @@ export function InventoryItemDetail() {
     const router = useRouter();
     const itemId = params.id;
 
-    const [activeTab, setActiveTab] = useState('details');
+    const [activeTab, setActiveTab] = useState('history');
     const [loading, setLoading] = useState(true);
     const [inventoryItem, setInventoryItem] = useState<any>(null);
+    const [username, setUsername] = useState('Warehouse Admin');
     
     // Left Panel Form States
     const [editForm, setEditForm] = useState({ inventory_name: '', description: '', is_active: true });
@@ -691,24 +930,35 @@ export function InventoryItemDetail() {
     const [newAttrModalOpen, setNewAttrModalOpen] = useState(false);
     const [newAttributeForm, setNewAttributeForm] = useState({ attribute_name: '', data_type: 'string' });
     const [newClassModalOpen, setNewClassModalOpen] = useState(false);
-    const [newClassName, setNewClassName] = useState('');
+    const [newClassForm, setNewClassForm] = useState({ classification_name: '', description: '' });
 
     // Tab 2 & 3: Ledger and MRF History
     const [stockHistory, setStockHistory] = useState<any[]>([]);
     const [mrfHistory, setMrfHistory] = useState<any[]>([]);
     const [editingHistoryId, setEditingHistoryId] = useState<number | null>(null);
     const [historyEditForm, setHistoryEditForm] = useState({ qty_change: 0, remarks: '' });
+    
+    // NEW: Manual Ledger Entry States
+    const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
+    const [transactionTypes, setTransactionTypes] = useState<any[]>([]);
+    const [ledgerForm, setLedgerForm] = useState({ type_id: '', qty: '', remarks: '', reference_id: '', project_id: '' });
 
     // Tab 4: SUPPLIER STATES
     const [invSuppliers, setInvSuppliers] = useState<any[]>([]);
     const [companies, setCompanies] = useState<any[]>([]);
     const [catalogOptions, setCatalogOptions] = useState<any[]>([]);
     const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
-    
-    // Updated Form to use SupplierProductID instead of raw strings
     const [supplierForm, setSupplierForm] = useState({ supplier_product_id: '', lead_time_days: 0, moq: 1 });
 
-    useEffect(() => { if (itemId) fetchAllData(); }, [itemId]);
+    const [globalUOMs, setGlobalUOMs] = useState<any[]>([]);
+    const [createForm, setCreateForm] = useState({ dbos_code: '', inventory_name: '', description: '', uom_id: '' });
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+    useEffect(() => { 
+        const storedUser = localStorage.getItem('username');
+        if (storedUser) setUsername(storedUser);
+        if (itemId) fetchAllData(); 
+    }, [itemId]);
 
     const fetchAllData = async () => {
         try {
@@ -731,14 +981,16 @@ export function InventoryItemDetail() {
                 setItemClassifications(mappedClasses);
 
                 // Fetch secondary data concurrently
-                const [attrRes, classRes, histRes, supRes, mrfRes, compRes, catRes] = await Promise.all([
+                const [attrRes, classRes, histRes, supRes, mrfRes, compRes, catRes, txTypesRes, uomRes] = await Promise.all([
                     fetch(`${API_URL}/api/attributes`),
                     fetch(`${API_URL}/api/classifications`),
                     fetch(`${API_URL}/api/inventory/${itemId}/ledger`),
                     fetch(`${API_URL}/api/inventory/${itemId}/suppliers`),
                     fetch(`${API_URL}/api/inventory/${itemId}/mrfs`),
                     fetch(`${API_URL}/api/companies`),
-                    fetch(`${API_URL}/api/inventory/catalog/${encodeURIComponent(currentItem.dbos_code)}`)
+                    fetch(`${API_URL}/api/inventory/catalog/${encodeURIComponent(currentItem.dbos_code)}`),
+                    fetch(`${API_URL}/api/transactions/types`),
+                    fetch(`${API_URL}/api/uoms`)
                 ]);
 
                 if (attrRes.ok) setGlobalAttributes(await attrRes.json());
@@ -748,8 +1000,66 @@ export function InventoryItemDetail() {
                 if (mrfRes.ok) setMrfHistory(await mrfRes.json() || []);
                 if (compRes.ok) setCompanies(await compRes.json() || []);
                 if (catRes.ok) setCatalogOptions(await catRes.json() || []);
+                if (txTypesRes.ok) setTransactionTypes(await txTypesRes.json() || []);
+                if (uomRes.ok) setGlobalUOMs(await uomRes.json() || []);
             }
         } catch (err) { console.error(err); } finally { setLoading(false); }
+    };
+
+    const handleCreateItem = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        console.log("====== FRONTEND SUBMISSION LOG (ITEM DETAIL PAGE) ======");
+        console.log("1. Raw createForm state:", createForm);
+        console.log("2. Value of createForm.uom_id:", createForm.uom_id);
+        console.log("3. Type of createForm.uom_id:", typeof createForm.uom_id);
+
+        const formData = new FormData();
+        formData.append('dbos_code', createForm.dbos_code);
+        formData.append('inventory_name', createForm.inventory_name);
+        formData.append('description', createForm.description);
+        
+        const uomVal = String(createForm.uom_id); 
+        console.log("4. uomVal being appended to FormData:", uomVal);
+
+        formData.append('uom_id', uomVal);
+        formData.append('uomid', uomVal);
+        formData.append('uomId', uomVal);
+        formData.append('UOMID', uomVal);
+        formData.append('UOM_ID', uomVal);
+        
+        const validAttrs = itemAttributes.filter(a => a.attribute_id && a.value);
+        const validClasses = itemClassifications.filter(c => c.classification_id).map(c => c.classification_id);
+        
+        formData.append('attributes', JSON.stringify(validAttrs));
+        formData.append('classifications', JSON.stringify(validClasses));
+        
+        formData.append('Attributes', JSON.stringify(validAttrs));
+        formData.append('Classifications', JSON.stringify(validClasses));
+
+        if (imageFile) {
+            formData.append('image', imageFile);
+            formData.append('ImagePath', imageFile.name);
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/api/inventory`, { method: 'POST', body: formData });
+            if (res.ok) {
+                setIsCreateModalOpen(false);
+                setCreateForm({ dbos_code: '', inventory_name: '', description: '', uom_id: '' });
+                setItemAttributes([{ rowId: Date.now(), attribute_id: '', data_type: '', value: '' }]);
+                setItemClassifications([{ rowId: Date.now(), classification_id: '' }]);
+                setImageFile(null);
+                
+                // Specific to InventoryItemDetail
+                fetchAllData();
+                
+            } else { 
+                alert("DBOS Code must be unique or error occurred."); 
+            }
+        } catch (err) { 
+            alert("Error connecting to server."); 
+        }
     };
 
     const handleUpdateItem = async (e: React.FormEvent) => {
@@ -806,6 +1116,32 @@ export function InventoryItemDetail() {
     };
     const removeClassRow = (rowId: number) => setItemClassifications(prev => prev.filter(r => r.rowId !== rowId));
 
+    // --- MANUAL LEDGER LOGIC ---
+    const handleAddManualLedger = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(`${API_URL}/api/inventory/${itemId}/ledger/manual`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    transaction_type_id: parseInt(ledgerForm.type_id),
+                    qty: parseFloat(ledgerForm.qty),
+                    remarks: ledgerForm.remarks,
+                    reference_id: ledgerForm.reference_id ? parseInt(ledgerForm.reference_id) : null,
+                    project_id: ledgerForm.project_id ? parseInt(ledgerForm.project_id) : null,
+                    created_by: username
+                })
+            });
+            if (res.ok) {
+                setIsLedgerModalOpen(false);
+                setLedgerForm({ type_id: '', qty: '', remarks: '', reference_id: '', project_id: '' });
+                fetchAllData();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Failed to add transaction");
+            }
+        } catch (err) { alert("Error connecting to server."); }
+    };
+
     const handleUpdateHistoryRecord = async (ledgerID: number) => {
         try {
             const res = await fetch(`${API_URL}/api/inventory/history/${ledgerID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(historyEditForm) });
@@ -819,7 +1155,24 @@ export function InventoryItemDetail() {
         } catch (err) { alert("Error updating ledger."); }
     };
 
-    // --- NEW: SUPPLIER MAPPING HANDLERS ---
+    // DELETION LOGIC (Reverses Stock)
+    const handleDeleteLedgerEntry = async (ledgerId: number) => {
+        if (!ledgerId) return alert("Error: Missing Ledger ID from the database response.");
+        if (!confirm("Are you sure you want to delete this transaction? This will reverse the quantity change on the master inventory.")) return;
+        
+        try {
+            const res = await fetch(`${API_URL}/api/inventory/ledger/${ledgerId}`, { method: 'DELETE' });
+            if (res.ok) {
+                alert("Transaction successfully deleted and stock reversed.");
+                fetchAllData();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Failed to delete transaction");
+            }
+        } catch (err) { alert("Error connecting to server."); }
+    };
+
+    // --- SUPPLIER MAPPING HANDLERS ---
     const handleAddSupplier = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
@@ -871,12 +1224,12 @@ export function InventoryItemDetail() {
     const handleQuickCreateClassification = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/api/classifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ classification_name: newClassName }) });
+            const res = await fetch(`${API_URL}/api/classifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClassForm) });
             if (res.ok) {
                 const newClass = await res.json();
                 setGlobalClassifications([...globalClassifications, newClass]);
                 setNewClassModalOpen(false);
-                setNewClassName('');
+                setNewClassForm({ classification_name: '', description: '' });
             }
         } catch (err) {}
     };
@@ -886,6 +1239,8 @@ export function InventoryItemDetail() {
 
     const attrOptions = globalAttributes.map(a => ({ value: a.attribute_id, label: a.attribute_name, original: a }));
     const classOptions = globalClassifications.map(c => ({ value: c.classification_id, label: c.classification_name }));
+
+    const manualTransactionOptions = transactionTypes.filter(t => !['MRF_ISSUE', 'PO_RECEIPT'].includes(t.transaction_code));
 
     return (
         <div className="bg-slate-50 min-h-screen pb-12">
@@ -945,8 +1300,8 @@ export function InventoryItemDetail() {
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full min-h-[600px]">
                         <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50/50">
                             {[
-                                { id: 'details', label: 'Other Details' },
                                 { id: 'history', label: 'Stock Ledger (History)' },
+                                { id: 'details', label: 'Other Details' },
                                 { id: 'mrfs', label: 'Material Requisitions' },
                                 { id: 'suppliers', label: 'Supplier Setup' }
                             ].map(tab => (
@@ -965,7 +1320,7 @@ export function InventoryItemDetail() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {itemClassifications.map((row, index) => (
                                                 <div key={row.rowId} className="flex gap-2 items-center">
-                                                    <SearchableDropdown placeholder={index === itemClassifications.length - 1 && itemClassifications.length > 1 ? "+ Add another tag..." : "Select Tag..."} options={classOptions} value={row.classification_id} onChange={(val: any) => handleClassSelect(row.rowId, val)} onAddNew={(searchVal: string) => { setNewClassName(searchVal); setNewClassModalOpen(true); }} />
+                                                    <SearchableDropdown placeholder={index === itemClassifications.length - 1 && itemClassifications.length > 1 ? "+ Add another tag..." : "Select Tag..."} options={classOptions} value={row.classification_id} onChange={(val: any) => handleClassSelect(row.rowId, val)} onAddNew={(searchVal: string) => { setNewClassForm({ classification_name: searchVal, description: '' }); setNewClassModalOpen(true); }} />
                                                     {row.classification_id && index !== itemClassifications.length - 1 && <button type="button" onClick={() => removeClassRow(row.rowId)} className="p-2 text-slate-400 hover:text-red-500"><X className="h-4 w-4"/></button>}
                                                 </div>
                                             ))}
@@ -995,9 +1350,22 @@ export function InventoryItemDetail() {
                                 </div>
                             )}
 
-                            {/* TAB 2: LEDGER HISTORY */}
+                            {/* TAB 2: LEDGER HISTORY (WITH MANUAL ADDITION BUTTON) */}
                             {activeTab === 'history' && (
-                                <div className="animate-in fade-in duration-200">
+                                <div className="animate-in fade-in duration-200 space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h3 className="font-bold text-slate-800">Master Stock Ledger</h3>
+                                            <p className="text-xs text-slate-500 mt-0.5">A complete audit trail of every movement for this material.</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => setIsLedgerModalOpen(true)}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                        >
+                                            <Plus className="h-4 w-4" /> Add Transaction
+                                        </button>
+                                    </div>
+
                                     <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                                         <table className="w-full text-left text-sm">
                                             <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
@@ -1005,13 +1373,14 @@ export function InventoryItemDetail() {
                                                     <th className="p-4 font-bold">Date & Time</th>
                                                     <th className="p-4 font-bold">Transaction Type</th>
                                                     <th className="p-4 text-center font-bold">Qty Change</th>
-                                                    <th className="p-4 font-bold">Location</th>
-                                                    <th className="p-4 font-bold">Reference / Remarks</th>
+                                                    <th className="p-4 font-bold">Remarks</th>
+                                                    <th className="p-4 font-bold">User</th>
+                                                    <th className="p-4 font-bold text-center">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
                                                 {stockHistory.length === 0 ? (
-                                                    <tr><td colSpan={5} className="p-12 text-center text-slate-400 italic">No ledger history recorded for this item yet.</td></tr>
+                                                    <tr><td colSpan={6} className="p-12 text-center text-slate-400 italic">No ledger history recorded for this item yet.</td></tr>
                                                 ) : stockHistory.map((h, idx) => (
                                                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                                         <td className="p-4 text-slate-600 whitespace-nowrap">{h.created_at}</td>
@@ -1023,8 +1392,17 @@ export function InventoryItemDetail() {
                                                         <td className={`p-4 text-center font-bold text-base ${h.qty_change > 0 ? 'text-emerald-600' : h.qty_change < 0 ? 'text-red-600' : 'text-slate-600'}`}>
                                                             {h.qty_change > 0 ? '+' : ''}{h.qty_change}
                                                         </td>
-                                                        <td className="p-4 text-slate-600 text-sm font-medium">{h.destination}</td>
                                                         <td className="p-4 text-slate-500 text-sm italic">{h.remarks || <span className="text-slate-300">No remarks</span>}</td>
+                                                        <td className="p-4 text-slate-600 text-sm font-medium">{h.created_by || <span className="text-slate-400 italic">System</span>}</td>
+                                                        <td className="p-4 text-center">
+                                                            <button 
+                                                                onClick={() => handleDeleteLedgerEntry(h.ledger_id)} 
+                                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" 
+                                                                title="Delete Transaction & Reverse Stock"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -1080,7 +1458,7 @@ export function InventoryItemDetail() {
                                 </div>
                             )}
 
-                            {/* TAB 4: SUPPLIERS CATALOG LINK */}
+                            {/* TAB 4: SUPPLIERS (BRIDGE TABLE SETUP) */}
                             {activeTab === 'suppliers' && (
                                 <div className="animate-in fade-in duration-200 space-y-6">
                                     <div className="flex justify-between items-center bg-slate-50 p-4 border border-slate-200 rounded-xl">
@@ -1181,9 +1559,94 @@ export function InventoryItemDetail() {
                 </div>
             </div>
 
-            {/* Quick Create Modals */}
+            {/* MANUAL LEDGER TRANSACTION MODAL */}
+            {isLedgerModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-5 bg-blue-600 text-white flex justify-between items-center shrink-0">
+                            <div>
+                                <h3 className="font-bold text-lg flex items-center gap-2"><Plus className="h-5 w-5" /> Record Transaction</h3>
+                            </div>
+                            <button onClick={() => setIsLedgerModalOpen(false)} className="hover:text-blue-200 transition-colors p-1"><X className="h-6 w-6" /></button>
+                        </div>
+                        <form onSubmit={handleAddManualLedger} className="p-6 space-y-5 bg-slate-50">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Transaction Type *</label>
+                                <select 
+                                    required 
+                                    value={ledgerForm.type_id} 
+                                    onChange={e => setLedgerForm({...ledgerForm, type_id: e.target.value})} 
+                                    className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-semibold outline-none focus:border-blue-500 bg-white"
+                                >
+                                    <option value="" disabled>Select Type...</option>
+                                    {manualTransactionOptions.map(t => (
+                                        <option key={t.transaction_type_id} value={t.transaction_type_id}>{t.transaction_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Physical Quantity *</label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    min="0.01"
+                                    required 
+                                    value={ledgerForm.qty} 
+                                    onChange={e => setLedgerForm({...ledgerForm, qty: e.target.value})} 
+                                    className="w-full p-3 border border-slate-300 rounded-lg text-lg font-bold text-center outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" 
+                                    placeholder="Enter physical amount..." 
+                                />
+                                <div className="text-[10px] text-slate-400 italic text-center">System handles addition/deduction based on transaction type. Enter positive amounts only.</div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Reference ID (Optional)</label>
+                                    <input 
+                                        type="number" 
+                                        value={ledgerForm.reference_id} 
+                                        onChange={e => setLedgerForm({...ledgerForm, reference_id: e.target.value})} 
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" 
+                                        placeholder="e.g., Doc #" 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Project ID (Optional)</label>
+                                    <input 
+                                        type="number" 
+                                        value={ledgerForm.project_id} 
+                                        onChange={e => setLedgerForm({...ledgerForm, project_id: e.target.value})} 
+                                        className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" 
+                                        placeholder="e.g., 102" 
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Remarks / Notes</label>
+                                <textarea 
+                                    value={ledgerForm.remarks} 
+                                    onChange={e => setLedgerForm({...ledgerForm, remarks: e.target.value})} 
+                                    className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500 resize-none h-20" 
+                                    placeholder="Optional notes regarding this adjustment..." 
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                                <button type="button" onClick={() => setIsLedgerModalOpen(false)} className="px-5 py-2.5 text-slate-600 bg-white border border-slate-300 rounded-lg font-bold">Cancel</button>
+                                <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 flex items-center gap-2">
+                                    <Save className="h-4 w-4"/> Record Entry
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick Create Modals with elevated z-[100] */}
             {newAttrModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/70 z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-4 bg-slate-800 text-white flex justify-between items-center"><h3 className="font-bold">New Attribute</h3><button onClick={() => setNewAttrModalOpen(false)}><X className="h-4 w-4"/></button></div>
                         <form onSubmit={handleQuickCreateAttribute} className="p-5 space-y-4">
@@ -1201,11 +1664,18 @@ export function InventoryItemDetail() {
             )}
 
             {newClassModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/70 z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-4 bg-slate-800 text-white flex justify-between items-center"><h3 className="font-bold">New Tag / Classification</h3><button onClick={() => setNewClassModalOpen(false)}><X className="h-4 w-4"/></button></div>
                         <form onSubmit={handleQuickCreateClassification} className="p-5 space-y-4">
-                            <div><label className="block text-xs font-bold mb-1 text-slate-600">Tag Name</label><input required autoFocus value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="e.g. Flammable, Summer Collection" className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" /></div>
+                            <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-600">Tag Name *</label>
+                                <input required autoFocus value={newClassForm.classification_name} onChange={e => setNewClassForm({...newClassForm, classification_name: e.target.value})} placeholder="e.g. Flammable, Summer Collection" className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-600">Description</label>
+                                <input value={newClassForm.description} onChange={e => setNewClassForm({...newClassForm, description: e.target.value})} placeholder="Optional description..." className="w-full p-2 text-sm border rounded outline-none focus:border-blue-500" />
+                            </div>
                             <div className="pt-2"><button type="submit" className="w-full py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700">Create Tag</button></div>
                         </form>
                     </div>

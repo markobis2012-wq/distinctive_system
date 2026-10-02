@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, use } from 'react';
 import {
     FolderKanban, ArrowLeft, Save, Package, Paperclip,
     Plus, Trash2, Edit2, X, Image as ImageIcon,
-    ClipboardList, Send, Download, Layers, Component, CheckSquare
+    ClipboardList, Send, Download, Layers, Component, CheckSquare, Clock, Truck
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -852,7 +852,6 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                                             <label className="block text-[10px] font-bold text-slate-500 uppercase">Total Needed</label>
                                             <div className="flex items-end gap-1 w-full p-1.5 border-b">
                                                 <span className="text-sm text-slate-700 font-bold truncate">{(activeItemForParts.qty || 1) * partsForm.qty_per_item}</span>
-                                                {/* Smart lookup for the UOM abbreviation on the form */}
                                                 <span className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">{uoms.find((u: any) => u.uom_id === partsForm.uom_id)?.uom_abbr || ''}</span>
                                             </div>
                                         </div>
@@ -992,32 +991,72 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                 </div>
             )}
 
-            {/* MRF DETAILS VIEW MODAL */}
+            {/* UPGRADED: MRF DETAILS VIEW MODAL */}
             {viewingMrf && (
                 <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl flex flex-col max-h-[90vh]">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl flex flex-col max-h-[90vh]">
                         <div className="p-4 border-b bg-slate-800 text-white rounded-t-xl flex justify-between items-center">
-                            <div><h3 className="font-bold text-lg">MRF: {viewingMrf.mrf_number}</h3></div>
+                            <div><h3 className="font-bold text-lg flex items-center gap-2"><ClipboardList className="h-5 w-5" /> MRF: {viewingMrf.mrf_number}</h3></div>
                             <button onClick={() => setViewingMrf(null)} className="hover:text-slate-200"><X className="h-6 w-6" /></button>
                         </div>
                         <div className="p-6 overflow-y-auto bg-slate-50 flex-1">
                             <table className="w-full text-left text-sm text-slate-600 bg-white border border-slate-200 rounded-lg overflow-hidden">
                                 <thead className="bg-slate-100 text-slate-700 border-b border-slate-200">
-                                    <tr><th className="p-3">Material</th><th className="p-3 text-center">Qty Req</th><th className="p-3 text-center">Warehouse Stock</th><th className="p-3">Phase 2 Status</th></tr>
+                                    <tr>
+                                        <th className="p-3">Material</th>
+                                        <th className="p-3 text-center">Req Qty</th>
+                                        <th className="p-3 text-center">Issued</th>
+                                        <th className="p-3 text-center">Pending (PO)</th>
+                                        <th className="p-3">Status / Delivery</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
-                                    {mrfDetails.length === 0 ? <tr><td colSpan={4} className="p-6 text-center italic">Loading...</td></tr> : mrfDetails.map(d => (
-                                        <tr key={d.mrf_item_id} className="border-b border-slate-100">
-                                            <td className="p-3">{d.inventory_id === 0 ? <span className="font-bold text-blue-700">{d.custom_item_name} <span className="text-[10px] bg-blue-100 text-blue-800 px-1 rounded">CUSTOM</span></span> : <><div className="font-bold text-slate-800">{d.inventory_name}</div><div className="text-xs text-slate-400">{d.dbos_code}</div></>}</td>
-                                            <td className="p-3 text-center font-bold text-blue-700">{d.qty_requested} <span className="text-xs text-slate-500 uppercase ml-1">{d.uom_abbr}</span></td>
-                                            <td className="p-3 text-center font-bold text-slate-500">{d.inventory_id > 0 ? d.current_stock : 'N/A'}</td>
-                                            <td className="p-3">{d.procurement_flag ? <span className="text-red-600 font-bold text-xs">Route to Phase 3 (PO)</span> : <span className="text-emerald-600 font-bold text-xs">Ready for Production</span>}</td>
-                                        </tr>
-                                    ))}
+                                    {mrfDetails.length === 0 ? (
+                                        <tr><td colSpan={5} className="p-6 text-center italic">Loading...</td></tr>
+                                    ) : mrfDetails.map(d => {
+                                        const qtyIssued = d.qty_issued || 0;
+                                        const pendingQty = d.qty_requested - qtyIssued;
+
+                                        return (
+                                            <tr key={d.mrf_item_id} className="border-b border-slate-100">
+                                                <td className="p-3">
+                                                    {d.inventory_id === 0 ? (
+                                                        <span className="font-bold text-blue-700">{d.custom_item_name} <span className="text-[10px] bg-blue-100 text-blue-800 px-1 rounded">CUSTOM</span></span>
+                                                    ) : (
+                                                        <><div className="font-bold text-slate-800">{d.inventory_name}</div><div className="text-xs text-slate-400">{d.dbos_code}</div></>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-center font-bold text-blue-700">{d.qty_requested}</td>
+                                                <td className="p-3 text-center font-bold text-emerald-600">{qtyIssued > 0 ? qtyIssued : '-'}</td>
+                                                <td className="p-3 text-center font-bold text-orange-600">{pendingQty > 0 ? pendingQty : 0}</td>
+                                                <td className="p-3">
+                                                    {pendingQty <= 0 ? (
+                                                        <span className="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded">Fully Issued</span>
+                                                    ) : (
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider w-max ${
+                                                                d.status?.includes('PO') ? 'bg-blue-100 text-blue-700' :
+                                                                d.status?.includes('Canvassing') ? 'bg-amber-100 text-amber-700' : 
+                                                                'bg-slate-100 text-slate-700'
+                                                            }`}>
+                                                                {d.status || 'Pending Sourcing'}
+                                                            </span>
+                                                            {d.po_number && d.po_number !== 'N/A' && (
+                                                                <div className="text-xs mt-1">
+                                                                    <div className="font-bold text-slate-700 flex items-center gap-1"><Truck className="h-3 w-3" /> PO: {d.po_number}</div>
+                                                                    <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5"><Clock className="h-3 w-3" /> ETA: <span className="font-medium text-slate-700">{d.po_eta || d.expected_delivery_date || 'Pending Update'}</span></div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
-                        <div className="p-4 border-t bg-white flex justify-end rounded-b-xl"><button onClick={() => setViewingMrf(null)} className="px-5 py-2 border rounded-lg">Close</button></div>
+                        <div className="p-4 border-t bg-white flex justify-end rounded-b-xl"><button onClick={() => setViewingMrf(null)} className="px-5 py-2 border rounded-lg font-medium hover:bg-slate-50 transition-colors">Close Details</button></div>
                     </div>
                 </div>
             )}
