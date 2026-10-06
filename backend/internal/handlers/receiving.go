@@ -26,10 +26,15 @@ func HandleReceiveGoods(c *gin.Context) {
 		return
 	}
 
-	if err := models.ReceiveGoods(req.POItemID, req.QtyReceived); err != nil {
+	// NOTE: In a production environment with JWT auth, extract this from the token.
+	// We are hardcoding the Warehouse Admin to match your frontend state for now.
+	username := "Warehouse Admin"
+
+	if err := models.ReceiveGoods(req.POItemID, req.QtyReceived, username); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Goods successfully received into inventory!"})
 }
 

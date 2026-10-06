@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"backend/internal/models"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -39,23 +40,17 @@ func HandleGetAvailableProjectItems(c *gin.Context) {
 }
 
 func HandleAddDeliveryItem(c *gin.Context) {
-	var req struct {
-		DeliveryID    int    `json:"delivery_id"`
-		ProjectItemID int    `json:"project_item_id"`
-		DeliverQty    int    `json:"deliver_qty"`
-		Remarks       string `json:"remarks"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request"})
+	var payload models.AddDeliveryItemPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload format"})
 		return
 	}
 
-	err := models.AddDeliveryItem(req.DeliveryID, req.ProjectItemID, req.DeliverQty, req.Remarks)
-	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+	if err := models.AddDeliveryItem(payload); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(200, gin.H{"message": "Item added"})
+	c.JSON(http.StatusOK, gin.H{"message": "Item added to shipment"})
 }
 
 func HandleUpdateDeliveryItem(c *gin.Context) {

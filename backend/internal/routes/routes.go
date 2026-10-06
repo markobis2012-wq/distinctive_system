@@ -173,6 +173,10 @@ func SetupRouter() *gin.Engine {
 	r.GET("/api/po/awarded-items", handlers.HandleGetAwardedComponents)
 	r.POST("/api/po/generate", handlers.HandleGeneratePO)
 	r.POST("/api/canvass/cancel-award", handlers.HandleCancelAward)
+
+	r.GET("/api/rfqs", handlers.HandleGetVirtualRFQs)
+	r.GET("/api/rfqs/:rfq_number/items", handlers.HandleGetRFQPrintItems)
+
 	r.PUT("/api/schedule/bookings/:id", handlers.HandleUpdateBooking)
 
 	r.GET("/api/production/pipeline", handlers.HandleGetProductionPipeline)
@@ -219,6 +223,10 @@ func SetupRouter() *gin.Engine {
 	r.POST("/api/inventory/:id/ledger/manual", handlers.HandleAddManualLedgerEntry)
 
 	r.DELETE("/api/inventory/ledger/:ledger_id", handlers.HandleDeleteLedgerEntry)
+
+	r.GET("/api/rfqs/:rfq_number/quotes", handlers.HandleGetQuotesByRFQ)
+
+	r.PUT("/api/production/items/:id/start", handlers.HandleStartProduction)
 
 	r.Static("/uploads", "./uploads")
 	r.POST("/api/login", handlers.HandleLogin)

@@ -2,6 +2,7 @@ package models
 
 import (
 	"backend/internal/config"
+	"fmt"
 	"log"
 )
 
@@ -21,7 +22,6 @@ func GetProductionPipeline() ([]ProductionItem, error) {
 
 	var items []ProductionItem
 
-	// FIXED: Using `projects` instead of `tbl_projects`, `product_name`, and `project_items_id`
 	query := `
 		SELECT i.project_items_id, i.project_id, 
 		       COALESCE(p.project_name, 'Unknown Project'), 
@@ -66,16 +66,83 @@ func GetProductionPipeline() ([]ProductionItem, error) {
 }
 
 type AdvanceProductionPayload struct {
-	QtyToMove float64 `json:"qty_to_move"`
+	QtyToMove      float64 `json:"qty_to_move"`
+	InsertToLedger bool    `json:"insert_to_ledger"`
+	InventoryID    *int    `json:"inventory_id,omitempty"` // Required only if inserting to ledger
+	Username       string  `json:"username,omitempty"`
 }
 
 func AdvanceToReady(projectItemsID int, p AdvanceProductionPayload) error {
-	// FIXED: Using `project_items_id` in the WHERE clause
-	_, err := config.DB.Exec(`
+	// 1. Begin Database Transaction
+	tx, err := config.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start database transaction: %v", err)
+	}
+
+	// 2. Safely deduct from Production and Add to Ready
+	res, err := tx.Exec(`
 		UPDATE tbl_project_items 
 		SET qty_in_production = qty_in_production - ?, 
 		    qty_ready_for_delivery = qty_ready_for_delivery + ? 
+		WHERE project_items_id = ? AND qty_in_production >= ?`,
+		p.QtyToMove, p.QtyToMove, projectItemsID, p.QtyToMove)
+
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update production quantities: %v", err)
+	}
+
+	// Ensure we actually updated something (prevents moving more qty than exists)
+	rowsAffected, _ := res.RowsAffected()
+	if rowsAffected == 0 {
+		tx.Rollback()
+		return fmt.Errorf("invalid quantity or item not found in production")
+	}
+
+	// 3. OPTIONAL: Insert Finished Good into Master Inventory Ledger
+	if p.InsertToLedger && p.InventoryID != nil && *p.InventoryID > 0 {
+
+		// Grab the project_id associated with this project item
+		var projectID int
+		err = tx.QueryRow("SELECT project_id FROM tbl_project_items WHERE project_items_id = ?", projectItemsID).Scan(&projectID)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to verify project ID: %v", err)
+		}
+
+		user := p.Username
+		if user == "" {
+			user = "System"
+		}
+
+		// Adjust the transaction_type_id (e.g., 4) to match whatever "PRODUCTION_RECEIPT" is in your tbl_inventory_transaction_types table
+		transactionTypeID := 4
+
+		ledgerQuery := `
+			INSERT INTO tbl_inventory_ledger 
+			(inventory_id, transaction_type_id, qty_change, reference_id, project_id, destination, status, remarks, created_by)
+			VALUES (?, ?, ?, ?, ?, 'Staging Area', 'Staged / Ready', 'Finished Good produced from floor', ?)`
+
+		_, err = tx.Exec(ledgerQuery, *p.InventoryID, transactionTypeID, p.QtyToMove, projectItemsID, projectID, user)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to insert into master ledger: %v", err)
+		}
+	}
+
+	// 4. Commit Transaction
+	return tx.Commit()
+}
+
+type StartProductionPayload struct {
+	QtyToStart float64 `json:"qty_to_start"`
+}
+
+func StartProduction(projectItemsID int, qty float64) error {
+	_, err := config.DB.Exec(`
+		UPDATE tbl_project_items 
+		SET qty_in_production = qty_in_production + ? 
 		WHERE project_items_id = ?`,
-		p.QtyToMove, p.QtyToMove, projectItemsID)
+		qty, projectItemsID)
 	return err
 }

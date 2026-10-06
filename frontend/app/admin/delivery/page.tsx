@@ -28,7 +28,7 @@ export default function DeliveryPage() {
 
     const [itemForm, setItemForm] = useState({
         delivery_item_id: 0,
-        project_item_id: 0,
+        project_item_component_id: 0, // UPDATED: Focus strictly on components
         deliver_qty: 1,
         remarks: ''
     });
@@ -111,7 +111,7 @@ export default function DeliveryPage() {
                 .then(res => res.json()).then(data => setDeliveryItems(Array.isArray(data) ? data : []));
         } else {
             setDeliveryItems([]); setAvailableProjItems([]);
-            setItemForm({ delivery_item_id: 0, project_item_id: 0, deliver_qty: 1, remarks: '' });
+            setItemForm({ delivery_item_id: 0, project_item_component_id: 0, deliver_qty: 1, remarks: '' });
         }
     }, [isManageModalOpen, selectedDelivery]);
 
@@ -127,10 +127,10 @@ export default function DeliveryPage() {
         } catch (err) { alert("Server error connecting to FSM Calendar."); }
     };
 
-    // --- PHASE 4: Handle Accomplishment Submission ---
+    // --- PHASE 5: Handle Accomplishment Submission (Ledger Deduction) ---
     const handleCompleteDelivery = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!confirm("Are you sure? This will officially close the Delivery and deduct the items from the Project Inventory!")) return;
+        if (!confirm("Are you sure? This will officially close the Delivery and PERMANENTLY DEDUCT the items from the Master Inventory Ledger!")) return;
 
         const formData = new FormData();
         formData.append('notes', completeNotes);
@@ -139,7 +139,7 @@ export default function DeliveryPage() {
         try {
             const res = await fetch(`${API_URL}/api/deliveries/${selectedDelivery.delivery_id}/complete`, {
                 method: 'POST',
-                body: formData // No Content-Type header needed for FormData
+                body: formData 
             });
 
             if (res.ok) {
@@ -157,7 +157,7 @@ export default function DeliveryPage() {
 
     const handleSaveItem = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (itemForm.project_item_id === 0) return alert("Select an item");
+        if (itemForm.project_item_component_id === 0) return alert("Select an item");
         if (itemForm.deliver_qty > maxAllowedQty && itemForm.delivery_item_id === 0) {
             return alert(`Quantity exceeds available pending limit (${maxAllowedQty}).`);
         }
@@ -171,7 +171,7 @@ export default function DeliveryPage() {
 
         const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (res.ok) {
-            setItemForm({ delivery_item_id: 0, project_item_id: 0, deliver_qty: 1, remarks: '' });
+            setItemForm({ delivery_item_id: 0, project_item_component_id: 0, deliver_qty: 1, remarks: '' });
             setMaxAllowedQty(1);
             fetch(`${API_URL}/api/deliveries/${selectedDelivery.delivery_id}/items`)
                 .then(r => r.json()).then(d => setDeliveryItems(Array.isArray(d) ? d : []));
@@ -362,7 +362,7 @@ export default function DeliveryPage() {
                                     <Truck className="h-4 w-4"/> Dispatch / In Transit
                                 </button>
 
-                                {/* PHASE 4 BUTTON! */}
+                                {/* PHASE 5 BUTTON! */}
                                 <button onClick={() => setIsCompleteModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-bold shadow-sm hover:bg-indigo-700 flex items-center gap-1 border border-indigo-500">
                                     <CheckCircle2 className="h-4 w-4"/> Complete Delivery
                                 </button>
@@ -382,31 +382,36 @@ export default function DeliveryPage() {
                                 <form onSubmit={handleSaveItem} className="space-y-4">
                                     {itemForm.delivery_item_id === 0 && (
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Select Project Item *</label>
-                                            <select required value={itemForm.project_item_id} onChange={e => {
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Select Project Component *</label>
+                                            <select required value={itemForm.project_item_component_id} onChange={e => {
                                                 const id = parseInt(e.target.value);
-                                                const selected = availableProjItems.find(i => i.project_items_id === id);
-                                                const max = selected ? selected.pending : 1;
+                                                const selected = availableProjItems.find(i => i.project_item_component_id === id);
+                                                const max = selected ? selected.available_qty : 1;
                                                 if (max <= 0 && id !== 0) alert("All items for this product have already been delivered.");
-                                                setItemForm({ ...itemForm, project_item_id: id, deliver_qty: max > 0 ? 1 : 0 });
+                                                
+                                                setItemForm({ ...itemForm, project_item_component_id: id, deliver_qty: max > 0 ? 1 : 0 });
                                                 setMaxAllowedQty(max);
                                             }} className="w-full p-2 border border-slate-300 rounded outline-none text-sm bg-white">
-                                                <option value="0">Select item...</option>
-                                                {availableProjItems.map(p => <option key={p.project_items_id} value={p.project_items_id}>{p.product_name} (Pending: {p.pending})</option>)}
+                                                <option value="0">Select component...</option>
+                                                {availableProjItems.map(p => (
+                                                    <option key={p.project_item_component_id} value={p.project_item_component_id}>
+                                                        {p.parent_item_name} - {p.part_name} (Avail: {p.available_qty})
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
                                     )}
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">Qty <span className="text-orange-600 ml-1">(Max: {maxAllowedQty})</span></label>
-                                        <input type="number" min={maxAllowedQty > 0 ? "1" : "0"} max={itemForm.delivery_item_id === 0 ? maxAllowedQty : undefined} required disabled={maxAllowedQty <= 0 && itemForm.project_item_id !== 0} value={itemForm.deliver_qty} onChange={e => setItemForm({ ...itemForm, deliver_qty: parseInt(e.target.value) || 0 })} className="w-full p-2 border border-slate-300 rounded outline-none focus:border-blue-500 text-sm disabled:bg-slate-100" />
+                                        <input type="number" min={maxAllowedQty > 0 ? "1" : "0"} max={itemForm.delivery_item_id === 0 ? maxAllowedQty : undefined} required disabled={maxAllowedQty <= 0 && itemForm.project_item_component_id !== 0} value={itemForm.deliver_qty} onChange={e => setItemForm({ ...itemForm, deliver_qty: parseInt(e.target.value) || 0 })} className="w-full p-2 border border-slate-300 rounded outline-none focus:border-blue-500 text-sm disabled:bg-slate-100" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">Remarks</label>
-                                        <textarea rows={2} value={itemForm.remarks} disabled={maxAllowedQty <= 0 && itemForm.project_item_id !== 0} onChange={e => setItemForm({ ...itemForm, remarks: e.target.value })} className="w-full p-2 border border-slate-300 rounded outline-none text-sm resize-none" placeholder="Condition, tags..." />
+                                        <textarea rows={2} value={itemForm.remarks} disabled={maxAllowedQty <= 0 && itemForm.project_item_component_id !== 0} onChange={e => setItemForm({ ...itemForm, remarks: e.target.value })} className="w-full p-2 border border-slate-300 rounded outline-none text-sm resize-none" placeholder="Condition, tags..." />
                                     </div>
                                     <div className="flex gap-2 pt-2">
-                                        {itemForm.delivery_item_id > 0 && <button type="button" onClick={() => setItemForm({ delivery_item_id: 0, project_item_id: 0, deliver_qty: 1, remarks: '' })} className="flex-1 py-2 border border-slate-300 rounded font-medium text-sm">Cancel</button>}
-                                        <button type="submit" disabled={maxAllowedQty <= 0 && itemForm.project_item_id !== 0} className={`flex-1 py-2 text-white rounded font-medium shadow-sm text-sm ${maxAllowedQty <= 0 && itemForm.project_item_id !== 0 ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'}`}>{itemForm.delivery_item_id > 0 ? 'Update Item' : 'Add to Shipment'}</button>
+                                        {itemForm.delivery_item_id > 0 && <button type="button" onClick={() => setItemForm({ delivery_item_id: 0, project_item_component_id: 0, deliver_qty: 1, remarks: '' })} className="flex-1 py-2 border border-slate-300 rounded font-medium text-sm">Cancel</button>}
+                                        <button type="submit" disabled={maxAllowedQty <= 0 && itemForm.project_item_component_id !== 0} className={`flex-1 py-2 text-white rounded font-medium shadow-sm text-sm ${maxAllowedQty <= 0 && itemForm.project_item_component_id !== 0 ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'}`}>{itemForm.delivery_item_id > 0 ? 'Update Item' : 'Add to Shipment'}</button>
                                     </div>
                                 </form>
                             </div>
@@ -443,7 +448,7 @@ export default function DeliveryPage() {
                                                     <td className="px-4 py-3 text-center font-black text-emerald-600 text-lg">{i.qty || i.item_qty}</td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex justify-end gap-1">
-                                                            <button onClick={() => setItemForm({ ...i, project_item_id: i.project_item_id, deliver_qty: i.qty || i.item_qty })} className="text-blue-600 hover:text-blue-800 p-1.5 bg-blue-50 hover:bg-blue-100 rounded transition-colors"><Edit2 className="h-4 w-4" /></button>
+                                                            <button onClick={() => setItemForm({ ...i, project_item_component_id: i.project_item_component_id, deliver_qty: i.qty || i.item_qty })} className="text-blue-600 hover:text-blue-800 p-1.5 bg-blue-50 hover:bg-blue-100 rounded transition-colors"><Edit2 className="h-4 w-4" /></button>
                                                             <button onClick={() => handleDeleteItem(i.delivery_item_id)} className="text-red-600 hover:text-red-800 p-1.5 bg-red-50 hover:bg-red-100 rounded transition-colors"><Trash2 className="h-4 w-4" /></button>
                                                         </div>
                                                     </td>
@@ -509,15 +514,11 @@ export default function DeliveryPage() {
                             <button onClick={() => setIsPrintModalOpen(false)} className="px-5 py-2 border border-slate-300 rounded text-slate-700 text-sm font-medium hover:bg-slate-100">Cancel</button>
                             <button
                                 onClick={() => {
-                                    // 1. Generate the correct URL based on the selected print type
                                     const url = printForm.type === 'll'
                                         ? `/print/ll/${selectedDelivery?.delivery_id}?headings=${encodeURIComponent(printForm.dr_number)}&address=${encodeURIComponent(printForm.address)}&limit=${printForm.items_per_page}`
                                         : `/print/dr/${selectedDelivery?.delivery_id}?printer=${printForm.printer}&dr=${printForm.dr_number}&address=${encodeURIComponent(printForm.address)}&person=${encodeURIComponent(printForm.contact_person)}&contact=${encodeURIComponent(printForm.contact_number)}&limit=${printForm.items_per_page}`;
                                     
-                                    // 2. Open the tab first
                                     window.open(url, '_blank');
-                                    
-                                    // 3. Then close the modal
                                     setIsPrintModalOpen(false);
                                 }}
                                 className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm font-medium shadow-sm"
@@ -529,17 +530,17 @@ export default function DeliveryPage() {
                 </div>
             )}
 
-            {/* PHASE 4 COMPLETE MODAL */}
+            {/* PHASE 5 COMPLETE MODAL (LEDGER DEDUCTION) */}
             {isCompleteModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/70 z-[80] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
                         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-indigo-600 text-white">
-                            <h3 className="font-bold text-lg flex items-center gap-2"><CheckCircle2 className="h-5 w-5"/> Accomplishment Report</h3>
+                            <h3 className="font-bold text-lg flex items-center gap-2"><CheckCircle2 className="h-5 w-5"/> Close Delivery</h3>
                             <button onClick={() => setIsCompleteModalOpen(false)} className="hover:text-indigo-200"><X className="h-5 w-5" /></button>
                         </div>
                         <form onSubmit={handleCompleteDelivery} className="p-6 space-y-4">
                             <div className="bg-indigo-50 text-indigo-800 p-3 rounded-lg text-xs font-medium mb-4">
-                                Submitting this report will mark the Job Order as Completed and automatically deduct the items from the Project Manager's pending inventory.
+                                Submitting this report will mark the Shipment as Completed and <strong>permanently deduct the delivered items from the Master Inventory Ledger.</strong>
                             </div>
                             
                             <div>
@@ -553,19 +554,19 @@ export default function DeliveryPage() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Crew Notes / Exceptions</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">Delivery Notes / Exceptions</label>
                                 <textarea 
                                     rows={4} 
                                     value={completeNotes} 
                                     onChange={e => setCompleteNotes(e.target.value)} 
                                     className="w-full p-3 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm resize-none" 
-                                    placeholder="Enter any notes from the installation, missing items, or client remarks..." 
+                                    placeholder="Enter any notes from the delivery, missing items, or client remarks..." 
                                 />
                             </div>
                             
                             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
                                 <button type="button" onClick={() => setIsCompleteModalOpen(false)} className="px-5 py-2.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-100">Cancel</button>
-                                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-700">Submit Report</button>
+                                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-700">Confirm Deduction</button>
                             </div>
                         </form>
                     </div>

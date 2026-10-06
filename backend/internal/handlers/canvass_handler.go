@@ -151,3 +151,32 @@ func HandleDeleteCompany(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Company deleted successfully"})
 }
+
+func HandleGetVirtualRFQs(c *gin.Context) {
+	rfqs, err := models.GetVirtualRFQs()
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, rfqs)
+}
+
+func HandleGetRFQPrintItems(c *gin.Context) {
+	rfqNumber := c.Param("rfq_number")
+	items, err := models.GetRFQItemsForPrint(rfqNumber)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, items)
+}
+
+func HandleGetQuotesByRFQ(c *gin.Context) {
+	rfqNumber := c.Param("rfq_number")
+	quotes, err := models.GetQuotesByRFQ(rfqNumber)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, quotes)
+}

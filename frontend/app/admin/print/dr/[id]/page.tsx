@@ -34,7 +34,7 @@ export default function ClientHandoverDeliveryReceipt() {
             .then(res => res.json())
             .then(data => setDeliveryInfo(data));
 
-        // Fetch the ROLL-UP Client Report from the endpoint we built earlier
+        // Fetch the ROLL-UP Client Report
         fetch(`${API_URL}/api/deliveries/${deliveryId}/client-report`)
             .then(res => res.json())
             .then(data => setItems(Array.isArray(data) ? data : []));
@@ -117,7 +117,10 @@ export default function ClientHandoverDeliveryReceipt() {
                                     </div>
                                     <div className="text-right shrink-0">
                                         <div className="text-xs text-gray-400 font-bold uppercase mb-1">Delivered</div>
-                                        <div className="text-2xl font-black text-blue-700 bg-blue-50 px-4 py-1 rounded-lg border border-blue-100">1 {item.uom_abbr}</div>
+                                        {/* UPDATED: Dynamic Quantity */}
+                                        <div className="text-2xl font-black text-blue-700 bg-blue-50 px-4 py-1 rounded-lg border border-blue-100">
+                                            {item.assembled_qty || 1} {item.uom_abbr}
+                                        </div>
                                     </div>
                                 </div>
 

@@ -187,19 +187,12 @@ export default function InventoryPage() {
     const handleCreateItem = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        console.log("====== FRONTEND SUBMISSION LOG (INVENTORY PAGE) ======");
-        console.log("1. Raw createForm state:", createForm);
-        console.log("2. Value of createForm.uom_id:", createForm.uom_id);
-        console.log("3. Type of createForm.uom_id:", typeof createForm.uom_id);
-
         const formData = new FormData();
         formData.append('dbos_code', createForm.dbos_code);
         formData.append('inventory_name', createForm.inventory_name);
         formData.append('description', createForm.description);
         
         const uomVal = String(createForm.uom_id); 
-        console.log("4. uomVal being appended to FormData:", uomVal);
-
         formData.append('uom_id', uomVal);
         formData.append('uomid', uomVal);
         formData.append('uomId', uomVal);
@@ -226,7 +219,6 @@ export default function InventoryPage() {
                 setItemClassifications([{ rowId: Date.now(), classification_id: '' }]);
                 setImageFile(null);
                 
-                // Specific to InventoryPage
                 fetchInventory();
 
                 if (selectedMRF) {
@@ -276,7 +268,8 @@ export default function InventoryPage() {
                 const data = await res.json();
                 const initializedItems = data.map((item: any) => ({
                     ...item,
-                    qty_issued: item.inventory_id === 0 ? 0 : Math.min(item.qty_requested, item.qty_on_hand || 0)
+                    historical_issued: item.qty_issued || 0,
+                    qty_issued: item.inventory_id === 0 ? 0 : Math.min((item.qty_requested - (item.qty_issued || 0)), item.qty_on_hand || 0)
                 }));
                 setMrfItems(initializedItems);
             }
@@ -354,10 +347,7 @@ export default function InventoryPage() {
 
     return (
         <div className="bg-slate-50 min-h-screen pb-12 w-full flex flex-col items-center">
-            
             <div className="w-full px-8 max-w-[1600px] flex flex-col gap-6 pt-4">
-                
-                {/* Header Banner */}
                 <div className="bg-slate-900 text-white p-8 rounded-2xl shadow-md w-full relative">
                     <Link href="/" className="inline-flex items-center text-sm font-medium text-slate-400 hover:text-white mb-4 transition-colors">
                         <ArrowLeft className="h-4 w-4 mr-1" /> Back to Dashboard
@@ -371,7 +361,6 @@ export default function InventoryPage() {
                         </div>
                         
                         <div className="flex items-center gap-4">
-                            {/* NOTIFICATION BELL */}
                             <button 
                                 onClick={() => setIsMRFPanelOpen(!isMRFPanelOpen)} 
                                 className="relative p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors border border-slate-700"
@@ -390,7 +379,6 @@ export default function InventoryPage() {
                         </div>
                     </div>
 
-                    {/* MRF NOTIFICATION DROPDOWN PANEL */}
                     {isMRFPanelOpen && (
                         <div className="absolute top-24 right-8 w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-40 overflow-hidden text-slate-800">
                             <div className="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
@@ -415,10 +403,7 @@ export default function InventoryPage() {
                     )}
                 </div>
 
-                {/* Main Table Container */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full">
-                    
-                    {/* Search & Filter Top Bar */}
                     <div className="p-4 border-b border-slate-200 bg-slate-50/50">
                         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                             <div className="flex w-full sm:w-auto gap-2 flex-1">
@@ -526,7 +511,6 @@ export default function InventoryPage() {
                 </div>
             </div>
 
-            {/* RESTORED: FILTER MODAL */}
             {isFilterModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
@@ -589,7 +573,7 @@ export default function InventoryPage() {
                                                     onChange={(val: any) => {
                                                         const updated = [...filterAttributes];
                                                         updated[index].attribute_id = val;
-                                                        if (index === updated.length - 1 && val) updated.push({ rowId: Date.now(), attribute_id: '', value: '' });
+                                                        if (index === updated.length - 1 && val) updated.push({ rowId: Date.now() + 1, attribute_id: '', value: '' });
                                                         setFilterAttributes(updated);
                                                     }} 
                                                     renderItem={(attr: any) => (<div><div>{attr.attribute_name}</div><div className="text-[10px] text-slate-400 uppercase font-bold">{attr.data_type}</div></div>)} 
@@ -629,7 +613,6 @@ export default function InventoryPage() {
                 </div>
             )}
 
-            {/* MRF FULFILLMENT MODAL */}
             {selectedMRF && (
                 <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh]">
@@ -668,7 +651,10 @@ export default function InventoryPage() {
                                     <tbody>
                                         {mrfItems.map((item, index) => {
                                             const isCustom = item.inventory_id === 0;
-                                            const shortage = item.qty_requested - (item.qty_issued || 0);
+                                            
+                                            // Calculate shortage properly based on history vs current input
+                                            const currentIssue = parseFloat(item.qty_issued) || 0;
+                                            const shortage = item.qty_requested - item.historical_issued - currentIssue;
 
                                             return (
                                                 <tr key={item.mrf_item_id} className={`border-b border-slate-100 ${isCustom ? 'bg-orange-50/50' : item.qty_on_hand < item.qty_requested ? 'bg-red-50/50' : 'hover:bg-slate-50'}`}>
@@ -692,7 +678,7 @@ export default function InventoryPage() {
                                                                                 newItems[index].inventory_id = newInvId;
                                                                                 newItems[index].inventory_name = realItem.inventory_name;
                                                                                 newItems[index].qty_on_hand = realItem.qty_on_hand;
-                                                                                newItems[index].qty_issued = Math.min(item.qty_requested, realItem.qty_on_hand);
+                                                                                newItems[index].qty_issued = Math.min(item.qty_requested - item.historical_issued, realItem.qty_on_hand);
                                                                                 setMrfItems(newItems);
                                                                             }} 
                                                                             placeholder="Search items..." 
@@ -730,7 +716,7 @@ export default function InventoryPage() {
                                                     </td>
 
                                                     <td className="px-4 py-3 text-center font-bold text-blue-600 text-lg">{item.qty_requested}</td>
-                                                    <td className={`px-4 py-3 text-center font-bold text-lg ${isCustom ? 'text-slate-300' : item.qty_on_hand < item.qty_requested ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                    <td className={`px-4 py-3 text-center font-bold text-lg ${isCustom ? 'text-slate-300' : item.qty_on_hand < (item.qty_requested - item.historical_issued) ? 'text-red-600' : 'text-emerald-600'}`}>
                                                         {isCustom ? '?' : item.qty_on_hand}
                                                     </td>
 
@@ -738,18 +724,28 @@ export default function InventoryPage() {
                                                         {isCustom ? (
                                                             <span className="text-xs text-orange-600 font-bold bg-orange-100 px-2 py-1 rounded">Map item first</span>
                                                         ) : (
-                                                            <div className="flex flex-col items-center gap-1">
+                                                            <div className="flex flex-col items-center gap-1 w-full">
                                                                 <input 
-                                                                    type="number" step="0.01" min="0" max={item.qty_requested} 
-                                                                    value={item.qty_issued} 
+                                                                    type="number" step="0.01" min="0" max={item.qty_requested - item.historical_issued} 
+                                                                    value={item.qty_issued === '' ? '' : item.qty_issued} 
                                                                     onChange={(e) => {
                                                                         const newItems = [...mrfItems];
-                                                                        const val = Math.min(parseFloat(e.target.value) || 0, item.qty_on_hand, item.qty_requested);
+                                                                        let val: any = e.target.value;
+                                                                        if (val !== '') {
+                                                                            val = Math.min(parseFloat(val) || 0, item.qty_on_hand, item.qty_requested - item.historical_issued);
+                                                                        }
                                                                         newItems[index].qty_issued = val;
                                                                         setMrfItems(newItems);
                                                                     }}
-                                                                    className={`w-24 p-2 border-2 rounded text-center font-bold outline-none focus:ring-2 ${item.qty_on_hand < item.qty_requested ? 'border-red-300 focus:ring-red-200' : 'border-emerald-300 focus:ring-emerald-200'}`} 
+                                                                    className={`w-24 p-2 border-2 rounded text-center font-bold outline-none focus:ring-2 ${item.qty_on_hand < (item.qty_requested - item.historical_issued) ? 'border-red-300 focus:ring-red-200' : 'border-emerald-300 focus:ring-emerald-200'}`} 
                                                                 />
+                                                                
+                                                                {item.historical_issued > 0 && (
+                                                                    <div className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded mt-1 flex items-center justify-center gap-1 w-max mx-auto">
+                                                                        ✓ ALREADY ISSUED: {item.historical_issued}
+                                                                    </div>
+                                                                )}
+
                                                                 {shortage > 0 && (
                                                                     <div className="text-[10px] font-bold text-red-600 bg-red-100 border border-red-200 px-2 py-0.5 rounded mt-1 flex items-center gap-1 w-max mx-auto">
                                                                         <ShoppingCart className="h-3 w-3" /> To PO: {shortage.toFixed(2)}
@@ -776,7 +772,6 @@ export default function InventoryPage() {
                 </div>
             )}
 
-            {/* CREATE INVENTORY MODAL */}
             {isCreateModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -847,9 +842,7 @@ export default function InventoryPage() {
                                                                 : <input type="text" placeholder="Value" value={row.value || ''} onChange={e => handleAttrValueChange(row.rowId, e.target.value)} className="w-full p-2 border rounded text-sm bg-white outline-none focus:border-blue-500" />
                                                             ) : <input disabled value="" placeholder="Select spec first" className="w-full p-2 border border-dashed border-slate-200 rounded text-sm bg-slate-50 text-slate-400 cursor-not-allowed" />}
                                                         </div>
-                                                        {row.attribute_id && index !== itemAttributes.length - 1 && (
-                                                            <button type="button" onClick={() => removeAttrRow(row.rowId)} className="p-2 text-slate-400 hover:text-red-500 mt-0.5"><X className="h-4 w-4"/></button>
-                                                        )}
+                                                        {row.attribute_id && index !== itemAttributes.length - 1 && <button type="button" onClick={() => removeAttrRow(row.rowId)} className="p-2 text-slate-400 hover:text-red-500 mt-0.5"><X className="h-4 w-4"/></button>}
                                                     </div>
                                                 ))}
                                             </div>
@@ -867,7 +860,6 @@ export default function InventoryPage() {
                 </div>
             )}
 
-            {/* Quick Create Modals with elevated z-[100] */}
             {newAttrModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
@@ -1009,19 +1001,12 @@ export function InventoryItemDetail() {
     const handleCreateItem = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        console.log("====== FRONTEND SUBMISSION LOG (ITEM DETAIL PAGE) ======");
-        console.log("1. Raw createForm state:", createForm);
-        console.log("2. Value of createForm.uom_id:", createForm.uom_id);
-        console.log("3. Type of createForm.uom_id:", typeof createForm.uom_id);
-
         const formData = new FormData();
         formData.append('dbos_code', createForm.dbos_code);
         formData.append('inventory_name', createForm.inventory_name);
         formData.append('description', createForm.description);
         
         const uomVal = String(createForm.uom_id); 
-        console.log("4. uomVal being appended to FormData:", uomVal);
-
         formData.append('uom_id', uomVal);
         formData.append('uomid', uomVal);
         formData.append('uomId', uomVal);
@@ -1051,7 +1036,6 @@ export function InventoryItemDetail() {
                 setItemClassifications([{ rowId: Date.now(), classification_id: '' }]);
                 setImageFile(null);
                 
-                // Specific to InventoryItemDetail
                 fetchAllData();
                 
             } else { 
@@ -1264,7 +1248,6 @@ export function InventoryItemDetail() {
             </div>
 
             <div className="max-w-[1600px] mx-auto px-8 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* LEFT PANEL */}
                 <div className="lg:col-span-1 space-y-6">
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                         <h2 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-4">Item Details</h2>
@@ -1295,7 +1278,6 @@ export function InventoryItemDetail() {
                     </div>
                 </div>
 
-                {/* RIGHT PANEL: TABS */}
                 <div className="lg:col-span-2">
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full min-h-[600px]">
                         <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50/50">
@@ -1312,7 +1294,6 @@ export function InventoryItemDetail() {
                         </div>
 
                         <div className="flex-1 p-6 bg-white overflow-y-auto">
-                            {/* TAB 1: DETAILS */}
                             {activeTab === 'details' && (
                                 <div className="space-y-8 animate-in fade-in duration-200">
                                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
@@ -1350,7 +1331,6 @@ export function InventoryItemDetail() {
                                 </div>
                             )}
 
-                            {/* TAB 2: LEDGER HISTORY (WITH MANUAL ADDITION BUTTON) */}
                             {activeTab === 'history' && (
                                 <div className="animate-in fade-in duration-200 space-y-4">
                                     <div className="flex justify-between items-center">
@@ -1411,7 +1391,6 @@ export function InventoryItemDetail() {
                                 </div>
                             )}
 
-                            {/* TAB 3: MRF LIST WITH ETA TRACKING */}
                             {activeTab === 'mrfs' && (
                                 <div className="animate-in fade-in duration-200">
                                     <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -1458,7 +1437,6 @@ export function InventoryItemDetail() {
                                 </div>
                             )}
 
-                            {/* TAB 4: SUPPLIERS (BRIDGE TABLE SETUP) */}
                             {activeTab === 'suppliers' && (
                                 <div className="animate-in fade-in duration-200 space-y-6">
                                     <div className="flex justify-between items-center bg-slate-50 p-4 border border-slate-200 rounded-xl">
@@ -1482,7 +1460,6 @@ export function InventoryItemDetail() {
                                                             <option key={c.supplier_product_id} value={c.supplier_product_id}>{c.company_name} - {c.supplier_product_name}</option>
                                                         ))}
                                                     </select>
-                                                    <p className="text-[10px] text-blue-600 mt-1 italic">Don't see it? Add it to the supplier catalog via the Canvassing board.</p>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -1559,7 +1536,6 @@ export function InventoryItemDetail() {
                 </div>
             </div>
 
-            {/* MANUAL LEDGER TRANSACTION MODAL */}
             {isLedgerModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
@@ -1644,7 +1620,6 @@ export function InventoryItemDetail() {
                 </div>
             )}
 
-            {/* Quick Create Modals with elevated z-[100] */}
             {newAttrModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">

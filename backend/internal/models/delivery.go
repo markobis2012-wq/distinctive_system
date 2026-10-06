@@ -194,44 +194,52 @@ type ClientHandoverItem struct {
 	ComponentsList string `json:"components_list"`
 }
 
-func GetClientHandoverReport(deliveryID int) ([]ClientHandoverItem, error) {
-	// We GROUP BY the parent Project Item.
-	// The components are grouped into a single text string separated by the pipe "|" character so React can format it as bullets!
+type ClientReportItem struct {
+	ProjectItemID  int     `json:"project_items_id"`
+	ProductName    string  `json:"product_name"`
+	Description    string  `json:"description"`
+	ImagePath      string  `json:"image_path"`
+	UOMAbbr        string  `json:"uom_abbr"`
+	AssembledQty   float64 `json:"assembled_qty"`
+	ComponentsList string  `json:"components_list"`
+}
+
+func GetClientHandoverReport(deliveryID int) ([]ClientReportItem, error) {
+	// FIX: Group strictly by the Parent Project Item ID.
+	// We use MAX() for strings to prevent MySQL 'ONLY_FULL_GROUP_BY' errors
+	// while still merging all components into a single row.
 	query := `
 		SELECT 
-			a.project_item_id,
-			COALESCE(MAX(p.product_name), MAX(a.remarks), 'Custom / Unlinked Item') as product_name,
-			COALESCE(MAX(p.product_description), '') as description,
-			COALESCE(MAX(p.dbos_image_path), MAX(p.image_path), '') as image_path,
-			COALESCE(MAX(u.uom_abbr), 'Lot') as uom_abbr,
-			GROUP_CONCAT(CONCAT('• ', COALESCE(inv.inventory_name, sp.supplier_product_name, a.remarks, 'Part'), ' (Qty: ', a.deliver_qty, ')') SEPARATOR '|') as components_list
-		FROM tbl_delivery_item a
-		LEFT JOIN tbl_project_items p ON p.project_items_id = a.project_item_id
-		LEFT JOIN tbl_uom u ON u.uom_id = p.uom
-		LEFT JOIN tbl_project_item_component c ON c.project_item_component_id = a.project_item_component_id
-		LEFT JOIN tbl_inventory inv ON inv.inventory_id = c.inventory_id
-		LEFT JOIN tbl_supplier_products sp ON sp.supplier_product_id = c.supplier_product_id
-		WHERE a.delivery_id = ?
-		GROUP BY a.project_item_id
-		ORDER BY a.project_item_id ASC`
+			COALESCE(pi.project_items_id, di.delivery_item_id) AS group_id,
+			COALESCE(MAX(pi.product_name), MAX(di.remarks), 'Custom Delivery Item') AS product_name,
+			COALESCE(MAX(pi.product_description), '') AS description,
+			COALESCE(MAX(pi.image_path), MAX(pi.dbos_image_path), '') AS image_path,
+			COALESCE(MAX(u.uom_abbr), 'Units') AS uom_abbr,
+			ROUND(MIN(di.deliver_qty / COALESCE(NULLIF(pic.qty_per_item, 0), 1)), 2) AS assembled_qty,
+			GROUP_CONCAT(CONCAT(di.deliver_qty, 'x ', COALESCE(pic.part_name, di.remarks)) SEPARATOR '|') AS components_list
+		FROM tbl_delivery_item di
+		LEFT JOIN tbl_project_item_component pic ON di.project_item_component_id = pic.project_item_component_id
+		LEFT JOIN tbl_project_items pi ON pic.project_items_id = pi.project_items_id
+		LEFT JOIN tbl_uom u ON pi.uom = u.uom_id
+		WHERE di.delivery_id = ?
+		GROUP BY COALESCE(pi.project_items_id, di.delivery_item_id)
+	`
 
 	rows, err := config.DB.Query(query, deliveryID)
 	if err != nil {
-		log.Println("==> [HANDOVER DEBUG] SQL Error:", err)
 		return nil, err
 	}
 	defer rows.Close()
 
-	var items []ClientHandoverItem
+	var items []ClientReportItem
 	for rows.Next() {
-		var i ClientHandoverItem
-		err := rows.Scan(&i.ProjectItemID, &i.ProductName, &i.Description, &i.ImagePath, &i.UOMAbbr, &i.ComponentsList)
-		if err == nil {
+		var i ClientReportItem
+		if err := rows.Scan(&i.ProjectItemID, &i.ProductName, &i.Description, &i.ImagePath, &i.UOMAbbr, &i.AssembledQty, &i.ComponentsList); err == nil {
 			items = append(items, i)
 		}
 	}
 	if items == nil {
-		items = []ClientHandoverItem{}
+		items = []ClientReportItem{}
 	}
 	return items, nil
 }

@@ -121,8 +121,6 @@ export default function InventoryItemDetail() {
     const [supplierForm, setSupplierForm] = useState({ supplier_product_id: '', lead_time_days: 0, moq: 1 });
 
     const [globalUOMs, setGlobalUOMs] = useState<any[]>([]);
-    const [createForm, setCreateForm] = useState({ dbos_code: '', inventory_name: '', description: '', uom_id: '' });
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     useEffect(() => { 
         const storedUser = localStorage.getItem('username');
@@ -174,49 +172,6 @@ export default function InventoryItemDetail() {
                 if (uomRes.ok) setGlobalUOMs(await uomRes.json() || []);
             }
         } catch (err) { console.error(err); } finally { setLoading(false); }
-    };
-
-    const handleCreateItem = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        const formData = new FormData();
-        formData.append('dbos_code', createForm.dbos_code);
-        formData.append('inventory_name', createForm.inventory_name);
-        formData.append('description', createForm.description);
-        
-        // Pass every variation of the uom ID to bypass backend handler typos
-        const uomVal = String(createForm.uom_id || 1);
-        formData.append('uom_id', uomVal);
-        formData.append('uomid', uomVal);
-        formData.append('uomId', uomVal);
-        formData.append('UOMID', uomVal);
-        formData.append('UOM_ID', uomVal);
-        
-        const validAttrs = itemAttributes.filter(a => a.attribute_id && a.value);
-        const validClasses = itemClassifications.filter(c => c.classification_id).map(c => c.classification_id);
-        
-        formData.append('attributes', JSON.stringify(validAttrs));
-        formData.append('classifications', JSON.stringify(validClasses));
-        
-        formData.append('Attributes', JSON.stringify(validAttrs));
-        formData.append('Classifications', JSON.stringify(validClasses));
-
-        if (imageFile) {
-            formData.append('image', imageFile);
-            formData.append('ImagePath', imageFile.name);
-        }
-
-        try {
-            const res = await fetch(`${API_URL}/api/inventory`, { method: 'POST', body: formData });
-            if (res.ok) {
-                setIsCreateModalOpen(false);
-                setCreateForm({ dbos_code: '', inventory_name: '', description: '', uom_id: '' });
-                setItemAttributes([{ rowId: Date.now(), attribute_id: '', data_type: '', value: '' }]);
-                setItemClassifications([{ rowId: Date.now(), classification_id: '' }]);
-                setImageFile(null);
-                fetchAllData();
-            } else { alert("DBOS Code must be unique or error occurred."); }
-        } catch (err) { alert("Error connecting to server."); }
     };
 
     const handleUpdateItem = async (e: React.FormEvent) => {
@@ -297,19 +252,6 @@ export default function InventoryItemDetail() {
                 alert(data.error || "Failed to add transaction");
             }
         } catch (err) { alert("Error connecting to server."); }
-    };
-
-    const handleUpdateHistoryRecord = async (ledgerID: number) => {
-        try {
-            const res = await fetch(`${API_URL}/api/inventory/history/${ledgerID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(historyEditForm) });
-            if (res.ok) {
-                setEditingHistoryId(null);
-                fetchAllData();
-            } else {
-                const data = await res.json();
-                alert(data.error);
-            }
-        } catch (err) { alert("Error updating ledger."); }
     };
 
     // DELETION LOGIC (Reverses Stock)
@@ -421,7 +363,6 @@ export default function InventoryItemDetail() {
             </div>
 
             <div className="max-w-[1600px] mx-auto px-8 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* LEFT PANEL */}
                 <div className="lg:col-span-1 space-y-6">
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                         <h2 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-4">Item Details</h2>
@@ -452,7 +393,6 @@ export default function InventoryItemDetail() {
                     </div>
                 </div>
 
-                {/* RIGHT PANEL: TABS */}
                 <div className="lg:col-span-2">
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full min-h-[600px]">
                         <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-50/50">
@@ -469,7 +409,6 @@ export default function InventoryItemDetail() {
                         </div>
 
                         <div className="flex-1 p-6 bg-white overflow-y-auto">
-                            {/* TAB 1: DETAILS */}
                             {activeTab === 'details' && (
                                 <div className="space-y-8 animate-in fade-in duration-200">
                                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
@@ -507,7 +446,6 @@ export default function InventoryItemDetail() {
                                 </div>
                             )}
 
-                            {/* TAB 2: LEDGER HISTORY (WITH MANUAL ADDITION BUTTON) */}
                             {activeTab === 'history' && (
                                 <div className="animate-in fade-in duration-200 space-y-4">
                                     <div className="flex justify-between items-center">
@@ -568,7 +506,6 @@ export default function InventoryItemDetail() {
                                 </div>
                             )}
 
-                            {/* TAB 3: MRF LIST WITH ETA TRACKING */}
                             {activeTab === 'mrfs' && (
                                 <div className="animate-in fade-in duration-200">
                                     <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -615,13 +552,12 @@ export default function InventoryItemDetail() {
                                 </div>
                             )}
 
-                            {/* TAB 4: SUPPLIERS (BRIDGE TABLE SETUP) */}
                             {activeTab === 'suppliers' && (
                                 <div className="animate-in fade-in duration-200 space-y-6">
                                     <div className="flex justify-between items-center bg-slate-50 p-4 border border-slate-200 rounded-xl">
                                         <div>
                                             <h3 className="font-bold text-slate-800 flex items-center gap-2"><Building2 className="h-5 w-5 text-blue-600" /> Authorized Vendor Products</h3>
-                                            <p className="text-xs text-slate-500 mt-1">Configure MOQs, lead times, and preferred suppliers for procurement automation.</p>
+                                            <p className="text-xs text-slate-50 mt-1">Configure MOQs, lead times, and preferred suppliers for procurement automation.</p>
                                         </div>
                                         <button onClick={() => setIsAddSupplierOpen(!isAddSupplierOpen)} className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm">
                                             {isAddSupplierOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />} {isAddSupplierOpen ? 'Cancel' : 'Add Rule'}
@@ -639,7 +575,6 @@ export default function InventoryItemDetail() {
                                                             <option key={c.supplier_product_id} value={c.supplier_product_id}>{c.company_name} - {c.supplier_product_name}</option>
                                                         ))}
                                                     </select>
-                                                    <p className="text-[10px] text-blue-600 mt-1 italic">Don't see it? Add it to the supplier catalog via the Canvassing board.</p>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -801,7 +736,6 @@ export default function InventoryItemDetail() {
                 </div>
             )}
 
-            {/* Quick Create Modals with elevated z-[100] */}
             {newAttrModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/70 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">

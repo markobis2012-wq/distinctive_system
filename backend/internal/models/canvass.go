@@ -149,9 +149,22 @@ func AwardQuotation(canvassID int, mrfItemID int) error {
 		return err
 	}
 
-	// 3. NEW: Tell the MRF Item that it has been successfully sourced!
-	// This makes it show as "Supplier Awarded" on the frontend and moves it to the PO queue.
+	// 3. Tell the MRF Item that it has been successfully sourced
 	_, err = tx.Exec(`UPDATE tbl_mrf_items SET has_selected_supplier = 1 WHERE mrf_item_id = ?`, mrfItemID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// 4. AUTO-MAPPING: Link this supplier product to the Master Inventory item automatically
+	// We use INSERT IGNORE so if they are already mapped, it won't crash or duplicate.
+	_, err = tx.Exec(`
+		INSERT IGNORE INTO tbl_inventory_suppliers (inventory_id, supplier_product_id, lead_time_days, moq, is_preferred)
+		SELECT mi.inventory_id, cq.supplier_product_id, 0, 1, 0
+		FROM tbl_mrf_items mi
+		JOIN tbl_canvass_quotations cq ON cq.canvass_id = ?
+		WHERE mi.mrf_item_id = ? AND mi.inventory_id IS NOT NULL AND cq.supplier_product_id IS NOT NULL AND cq.supplier_product_id > 0
+	`, canvassID, mrfItemID)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -206,11 +219,36 @@ func AddBulkQuotations(req BulkRFQRequest) error {
 	}
 
 	for _, id := range req.MRFItemIDs {
-		_, err := tx.Exec(`INSERT INTO tbl_canvass_quotations (mrf_item_id, supplier_id, rfq_number, quoted_unit_price, quoted_landed_price, quoted_selling_price, remarks) VALUES (?, ?, ?, 0, 0, 0, '')`,
-			id, req.SupplierID, req.RFQNumber)
+		// 1. Check if this supplier is already prospected for this item
+		var exists bool
+		err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM tbl_canvass_quotations WHERE mrf_item_id = ? AND supplier_id = ?)`, id, req.SupplierID).Scan(&exists)
 		if err != nil {
 			tx.Rollback()
 			return err
+		}
+
+		if exists {
+			// 2A. Update the existing row (this preserves the supplier_product_id you mapped!)
+			_, err = tx.Exec(`
+				UPDATE tbl_canvass_quotations 
+				SET rfq_number = ? 
+				WHERE mrf_item_id = ? AND supplier_id = ? AND (rfq_number IS NULL OR rfq_number = '')`,
+				req.RFQNumber, id, req.SupplierID)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+		} else {
+			// 2B. If they never mapped it, insert a new blank row for the RFQ
+			_, err = tx.Exec(`
+				INSERT INTO tbl_canvass_quotations 
+				(mrf_item_id, supplier_id, rfq_number, quoted_unit_price, quoted_landed_price, quoted_selling_price, remarks) 
+				VALUES (?, ?, ?, 0, 0, 0, '')`,
+				id, req.SupplierID, req.RFQNumber)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
 		}
 	}
 	return tx.Commit()
@@ -335,4 +373,145 @@ func GeneratePO(req GeneratePORequest) error {
 	}
 
 	return tx.Commit()
+}
+
+type VirtualRFQ struct {
+	RFQNumber    string `json:"rfq_number"`
+	SupplierID   int    `json:"supplier_id"`
+	SupplierName string `json:"supplier_name"`
+	DateQuoted   string `json:"date_quoted"`
+	ItemCount    int    `json:"item_count"`
+	AwardedCount int    `json:"awarded_count"`
+	Status       string `json:"status"`
+}
+
+type RFQPrintItem struct {
+	DBOSCode       string  `json:"dbos_code"`
+	InventoryName  string  `json:"inventory_name"`
+	ProjectName    string  `json:"project_name"`
+	MRFNumber      string  `json:"mrf_number"`
+	QtyBackordered float64 `json:"qty_backordered"`
+	UOMAbbr        string  `json:"uom_abbr"`
+}
+
+func GetVirtualRFQs() ([]VirtualRFQ, error) {
+	query := `
+		SELECT 
+			q.rfq_number, 
+			q.supplier_id, 
+			COALESCE(c.company_name, 'Unknown'), 
+			MIN(q.date_quoted) as date_quoted,
+			COUNT(q.canvass_id) as item_count,
+			SUM(CASE WHEN q.is_selected = 1 THEN 1 ELSE 0 END) as awarded_count
+		FROM tbl_canvass_quotations q
+		LEFT JOIN tbl_company c ON q.supplier_id = c.company_id
+		WHERE q.rfq_number IS NOT NULL AND q.rfq_number != ''
+		GROUP BY q.rfq_number, q.supplier_id, c.company_name
+		ORDER BY date_quoted DESC`
+
+	rows, err := config.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []VirtualRFQ
+	for rows.Next() {
+		var r VirtualRFQ
+		if err := rows.Scan(&r.RFQNumber, &r.SupplierID, &r.SupplierName, &r.DateQuoted, &r.ItemCount, &r.AwardedCount); err == nil {
+			// Calculate virtual status
+			if r.AwardedCount == r.ItemCount {
+				r.Status = "Fully Awarded"
+			} else if r.AwardedCount > 0 {
+				r.Status = "Partially Awarded"
+			} else {
+				r.Status = "Pending Bids"
+			}
+			list = append(list, r)
+		}
+	}
+	if list == nil {
+		list = []VirtualRFQ{}
+	}
+	return list, nil
+}
+
+func GetRFQItemsForPrint(rfqNumber string) ([]RFQPrintItem, error) {
+	query := `
+		SELECT 
+			COALESCE(i.dbos_code, 'CUSTOM'), 
+			COALESCE(i.inventory_name, mi.custom_item_name), 
+			COALESCE(p.project_name, 'Unknown'), 
+			m.mrf_number, 
+			mi.qty_backordered, 
+			COALESCE(u.uom_abbr, 'UNIT')
+		FROM tbl_canvass_quotations q
+		JOIN tbl_mrf_items mi ON q.mrf_item_id = mi.mrf_item_id
+		JOIN tbl_mrf m ON mi.mrf_id = m.mrf_id
+		LEFT JOIN projects p ON m.project_id = p.projects_id
+		LEFT JOIN tbl_inventory i ON mi.inventory_id = i.inventory_id
+		LEFT JOIN tbl_uom u ON i.uom_id = u.uom_id
+		WHERE q.rfq_number = ?`
+
+	rows, err := config.DB.Query(query, rfqNumber)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []RFQPrintItem
+	for rows.Next() {
+		var item RFQPrintItem
+		if err := rows.Scan(&item.DBOSCode, &item.InventoryName, &item.ProjectName, &item.MRFNumber, &item.QtyBackordered, &item.UOMAbbr); err == nil {
+			list = append(list, item)
+		}
+	}
+	return list, nil
+}
+
+type RFQQuoteLine struct {
+	CanvassID          int     `json:"canvass_id"`
+	MRFItemID          int     `json:"mrf_item_id"`
+	DBOSCode           string  `json:"dbos_code"`
+	InventoryName      string  `json:"inventory_name"`
+	QtyBackordered     float64 `json:"qty_backordered"`
+	UOMAbbr            string  `json:"uom_abbr"`
+	QuotedUnitPrice    float64 `json:"quoted_unit_price"`
+	QuotedLandedPrice  float64 `json:"quoted_landed_price"`
+	QuotedSellingPrice float64 `json:"quoted_selling_price"`
+	Remarks            string  `json:"remarks"`
+	IsSelected         bool    `json:"is_selected"`
+}
+
+func GetQuotesByRFQ(rfqNumber string) ([]RFQQuoteLine, error) {
+	query := `
+		SELECT 
+			q.canvass_id, q.mrf_item_id, 
+			COALESCE(i.dbos_code, 'CUSTOM'), COALESCE(i.inventory_name, mi.custom_item_name), 
+			mi.qty_backordered, COALESCE(u.uom_abbr, 'UNIT'), 
+			q.quoted_unit_price, q.quoted_landed_price, q.quoted_selling_price, 
+			COALESCE(q.remarks, ''), q.is_selected
+		FROM tbl_canvass_quotations q
+		JOIN tbl_mrf_items mi ON q.mrf_item_id = mi.mrf_item_id
+		LEFT JOIN tbl_inventory i ON mi.inventory_id = i.inventory_id
+		LEFT JOIN tbl_uom u ON i.uom_id = u.uom_id
+		WHERE q.rfq_number = ?`
+
+	rows, err := config.DB.Query(query, rfqNumber)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []RFQQuoteLine
+	for rows.Next() {
+		var q RFQQuoteLine
+		if err := rows.Scan(&q.CanvassID, &q.MRFItemID, &q.DBOSCode, &q.InventoryName, &q.QtyBackordered, &q.UOMAbbr, &q.QuotedUnitPrice, &q.QuotedLandedPrice, &q.QuotedSellingPrice, &q.Remarks, &q.IsSelected); err == nil {
+			list = append(list, q)
+		}
+	}
+	if list == nil {
+		list = []RFQQuoteLine{}
+	}
+	return list, nil
 }

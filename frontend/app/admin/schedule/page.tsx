@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Plus, MapPin, Clock, Truck, Users, Trash2, PackagePlus, UserPlus, X, Save, GripVertical, Printer, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, MapPin, Clock, Truck, Users, Trash2, PackagePlus, UserPlus, X, Save, GripVertical, Printer, CheckCircle, Copy } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -19,6 +19,33 @@ const parseYMD = (str: string) => {
     const [y, m, d] = str.split('-').map(Number);
     return new Date(y, m - 1, d);
 };
+
+const extractSafeDate = (dt: string) => {
+    if (!dt) return '';
+    const match = dt.match(/^\d{4}-\d{2}-\d{2}/);
+    return match ? match[0] : '';
+};
+
+// --- NEW HELPER FUNCTIONS FOR MULTI-DAY SPANNING ---
+const isDateInBookingRange = (dateStr: string, b: any) => {
+    const s = extractSafeDate(b.start_date);
+    const e = extractSafeDate(b.end_date);
+    if (!s || !e) return false;
+    return dateStr >= s && dateStr <= e;
+};
+
+const getDisplayTime = (dateStr: string, b: any) => {
+    const s = extractSafeDate(b.start_date);
+    const e = extractSafeDate(b.end_date);
+    const sTime = b.start_time ? b.start_time.substring(0, 5) : '00:00';
+    const eTime = b.end_time ? b.end_time.substring(0, 5) : '23:59';
+    
+    if (s === e) return `${sTime} - ${eTime}`;
+    if (dateStr === s) return `${sTime} - 23:59`;
+    if (dateStr === e) return `00:00 - ${eTime}`;
+    return `00:00 - 23:59`; // Middle day of a 3+ day span
+};
+
 
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." }: any) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -65,6 +92,7 @@ export default function ScheduleDispatchPage() {
     const [projects, setProjects] = useState<any[]>([]);
     const [staff, setStaff] = useState<any[]>([]);
     const [projectComponents, setProjectComponents] = useState<any[]>([]);
+    const [readyItems, setReadyItems] = useState<any[]>([]);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<any>(null);
@@ -135,16 +163,19 @@ export default function ScheduleDispatchPage() {
         }
     };
 
-    const handleProjectChange = (projectId: number) => {
+    const handleProjectChange = async (projectId: number) => {
         setForm(prev => ({ ...prev, project_id: projectId }));
         setItems([]); 
         fetchProjectComponents(projectId);
-    };
 
-    const extractSafeDate = (dt: string) => {
-        if (!dt) return '';
-        const match = dt.match(/^\d{4}-\d{2}-\d{2}/);
-        return match ? match[0] : '';
+        if (projectId > 0) {
+            try {
+                const res = await fetch(`${API_URL}/api/projects/${projectId}/available-items`);
+                if (res.ok) setReadyItems(await res.json() || []);
+            } catch (err) { console.error("Failed to fetch available items", err); }
+        } else {
+            setReadyItems([]);
+        }
     };
 
     const openModal = async (b: any = null, dateStr: string = '') => {
@@ -159,8 +190,17 @@ export default function ScheduleDispatchPage() {
                 notes: b.notes || '', accomplishment_notes: b.accomplishment_notes || '', 
                 resource_id: b.resource_id || 0, group_id: b.group_id || 0
             });
-            if (b.project_id > 0) fetchProjectComponents(b.project_id);
-            else setProjectComponents([]);
+            
+            if (b.project_id > 0) {
+                fetchProjectComponents(b.project_id);
+                try {
+                    const res = await fetch(`${API_URL}/api/projects/${b.project_id}/available-items`);
+                    if (res.ok) setReadyItems(await res.json() || []);
+                } catch (err) {}
+            } else {
+                setProjectComponents([]);
+                setReadyItems([]);
+            }
 
             try {
                 const res = await fetch(`${API_URL}/api/schedule/bookings/${b.booking_id}/details`);
@@ -176,8 +216,24 @@ export default function ScheduleDispatchPage() {
             setItems([]);
             setCrew([]);
             setProjectComponents([]);
+            setReadyItems([]);
         }
         setIsModalOpen(true);
+    };
+
+    // --- NEW: DUPLICATE SCHEDULE LOGIC ---
+    const handleDuplicate = () => {
+        if (!confirm("This will duplicate the schedule with the same staff and details, but clear the payload so you can assign new items. Proceed?")) return;
+        
+        setForm(prev => ({
+            ...prev,
+            booking_id: 0,
+            booking_number: '',
+            status: 'Scheduled',
+            accomplishment_notes: ''
+        }));
+        setItems([]); 
+        // Crew and Project details remain, letting them change dates and save as new.
     };
 
     const handleSaveJobOrder = async (e: React.FormEvent) => {
@@ -196,28 +252,18 @@ export default function ScheduleDispatchPage() {
         } catch (err) { alert("Error connecting to server."); }
     };
 
-    // --- NEW: PHASE 2 BRIDGE (JO -> DELIVERY/LOADING LIST) ---
     const handlePushToWarehouse = async () => {
         if (!confirm("Are you sure? This will save the Job Order, generate the Delivery Receipt for the warehouse, and mark this truck as 'In Transit'.")) return;
 
         try {
-            // STEP 1: FORCE SAVE THE JOB ORDER FIRST!
-            // This ensures all items in React are actually pushed to MySQL before Go bridges them.
             const payload = { ...form, items, crew };
             const saveRes = await fetch(`${API_URL}/api/schedule/bookings/${form.booking_id}`, { 
-                method: 'PUT', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(payload) 
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) 
             });
 
-            if (!saveRes.ok) {
-                return alert("Failed to save the FSM payload. Cannot push to warehouse.");
-            }
+            if (!saveRes.ok) return alert("Failed to save the FSM payload. Cannot push to warehouse.");
 
-            // STEP 2: NOW TRIGGER THE BRIDGE
-            const res = await fetch(`${API_URL}/api/delivery/generate-from-booking/${form.booking_id}`, {
-                method: 'POST'
-            });
+            const res = await fetch(`${API_URL}/api/delivery/generate-from-booking/${form.booking_id}`, { method: 'POST' });
 
             if (res.ok) {
                 alert("Success! Job Order saved and Delivery Receipt generated.");
@@ -232,12 +278,10 @@ export default function ScheduleDispatchPage() {
         }
     };
 
-    // --- PHASE 4: PRINT ACCOMPLISHMENT REPORT ---
     const handlePrintReport = () => {
         const printWindow = window.open('', '_blank', 'width=900,height=1000');
         if (!printWindow) return alert("Please allow popups to print reports.");
 
-        // Resolve staff names and items for the print layout
         const crewListHTML = crew.map(c => {
             const s = staff.find(staff => staff.id === c.resource_id || staff.resource_id === c.resource_id);
             return `<tr><td class="py-2 border-b border-gray-200 text-sm">${s?.name || 'Unknown Staff'}</td><td class="py-2 border-b border-gray-200 text-sm text-gray-600">${c.specific_task || 'General Duties'}</td></tr>`;
@@ -246,8 +290,13 @@ export default function ScheduleDispatchPage() {
         const itemsListHTML = items.map(item => {
             let itemName = item.custom_item_name;
             if (form.project_id > 0 && item.project_item_component_id > 0) {
-                const pc = projectComponents.find(c => c.project_item_component_id === item.project_item_component_id);
-                if (pc) itemName = pc.inventory_name;
+                const fg = readyItems.find(r => r.project_item_component_id === item.project_item_component_id);
+                if (fg) {
+                    itemName = fg.parent_item_name + ' - ' + fg.part_name;
+                } else {
+                    const pc = projectComponents.find(c => c.project_item_component_id === item.project_item_component_id);
+                    if (pc) itemName = pc.part_name;
+                }
             }
             return `<tr><td class="py-2 border-b border-gray-200 text-sm">${itemName || 'Item #'+item.project_item_component_id}</td><td class="py-2 border-b border-gray-200 text-sm text-center font-bold">${item.qty_to_deliver}</td><td class="py-2 border-b border-gray-200 text-sm text-center"></td></tr>`;
         }).join('');
@@ -260,13 +309,9 @@ export default function ScheduleDispatchPage() {
             <head>
                 <title>Accomplishment Report - ${form.booking_number || 'DRAFT'}</title>
                 <script src="https://cdn.tailwindcss.com"></script>
-                <style>
-                    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-                </style>
+                <style> @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } } </style>
             </head>
             <body class="bg-white text-gray-900 p-10 font-sans">
-                
-                <!-- Header -->
                 <div class="flex justify-between items-start border-b-2 border-gray-800 pb-6 mb-8">
                     <div>
                         <h1 class="text-3xl font-bold uppercase tracking-widest text-gray-900">Job Order Report</h1>
@@ -278,12 +323,10 @@ export default function ScheduleDispatchPage() {
                     </div>
                 </div>
 
-                <!-- Job Details -->
                 <div class="grid grid-cols-2 gap-8 mb-8 bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div>
                         <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Job Title / Assignment</p>
                         <p class="font-bold text-lg text-gray-900">${form.title}</p>
-                        
                         <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1 mt-4">Location / Venue</p>
                         <p class="font-medium text-gray-800">${form.location_venue || 'N/A'}</p>
                     </div>
@@ -291,13 +334,11 @@ export default function ScheduleDispatchPage() {
                         <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Schedule execution</p>
                         <p class="font-medium text-gray-800">Start: ${form.start_date} at ${form.start_time}</p>
                         <p class="font-medium text-gray-800">End: ${form.end_date} at ${form.end_time}</p>
-
                         <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1 mt-4">Linked Project ID</p>
                         <p class="font-medium text-gray-800">${form.project_id > 0 ? '#' + form.project_id : 'General FSM Task'}</p>
                     </div>
                 </div>
 
-                <!-- Logistics Payload -->
                 <div class="mb-8">
                     <h3 class="text-sm font-bold uppercase tracking-wider text-gray-800 border-b-2 border-gray-200 pb-2 mb-4">Logistics & Delivery Payload</h3>
                     <table class="w-full text-left">
@@ -312,21 +353,16 @@ export default function ScheduleDispatchPage() {
                     </table>
                 </div>
 
-                <!-- Crew -->
                 <div class="mb-8">
                     <h3 class="text-sm font-bold uppercase tracking-wider text-gray-800 border-b-2 border-gray-200 pb-2 mb-4">Assigned Crew</h3>
                     <table class="w-full text-left">
                         <thead>
-                            <tr>
-                                <th class="py-2 text-xs text-gray-500 uppercase">Staff Name</th>
-                                <th class="py-2 text-xs text-gray-500 uppercase">Role / Task</th>
-                            </tr>
+                            <tr><th class="py-2 text-xs text-gray-500 uppercase">Staff Name</th><th class="py-2 text-xs text-gray-500 uppercase">Role / Task</th></tr>
                         </thead>
                         <tbody>${crewListHTML || '<tr><td colspan="2" class="py-4 text-gray-400 italic text-sm">No crew assigned.</td></tr>'}</tbody>
                     </table>
                 </div>
 
-                <!-- Execution Notes -->
                 <div class="mb-12">
                     <h3 class="text-sm font-bold uppercase tracking-wider text-gray-800 border-b-2 border-gray-200 pb-2 mb-4">Accomplishment Notes / Executive Summary</h3>
                     <div class="p-4 border border-gray-300 rounded-lg min-h-[100px] text-sm text-gray-700 bg-gray-50 whitespace-pre-wrap">
@@ -334,7 +370,6 @@ export default function ScheduleDispatchPage() {
                     </div>
                 </div>
 
-                <!-- Signatures -->
                 <div class="grid grid-cols-2 gap-16 mt-16 pt-8">
                     <div>
                         <div class="border-t border-gray-400 mb-2"></div>
@@ -357,11 +392,7 @@ export default function ScheduleDispatchPage() {
 
         printWindow.document.write(html);
         printWindow.document.close();
-        
-        // Wait 500ms for Tailwind CDN to process styles before opening print dialog
-        setTimeout(() => {
-            printWindow.print();
-        }, 500);
+        setTimeout(() => printWindow.print(), 500);
     };
 
     const getMinutes = (t: string) => {
@@ -481,7 +512,7 @@ export default function ScheduleDispatchPage() {
         for (let i = 0; i < firstDay; i++) days.push(<div key={`empty-${i}`} className="bg-slate-50 border-r border-b border-slate-200 min-h-[120px]"></div>);
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = formatDateYYYYMMDD(new Date(year, month, d));
-            const dayEvents = bookings.filter(b => extractSafeDate(b.start_date) === dateStr);
+            const dayEvents = bookings.filter(b => isDateInBookingRange(dateStr, b)); // Multi-day fix
             const isToday = dateStr === formatDateYYYYMMDD(new Date());
 
             days.push(
@@ -498,7 +529,7 @@ export default function ScheduleDispatchPage() {
                                      style={{ backgroundColor: `${color}15`, borderLeftColor: color, borderLeftWidth: '4px' }}
                                      className={`text-left p-1.5 rounded border border-slate-200 text-[10px] leading-tight shadow-sm text-slate-800`}>
                                     <div className="font-bold truncate">{event.title}</div>
-                                    <div className="flex items-center gap-1 mt-0.5 opacity-80"><Clock className="h-3 w-3" /> {event.start_time.substring(0,5)}</div>
+                                    <div className="flex items-center gap-1 mt-0.5 opacity-80"><Clock className="h-3 w-3" /> {getDisplayTime(dateStr, event)}</div>
                                 </div>
                             );
                         })}
@@ -541,8 +572,12 @@ export default function ScheduleDispatchPage() {
                     {weekDates.map(date => {
                         const dateStr = formatDateYYYYMMDD(date);
                         const dayEvents = bookings
-                            .filter(b => extractSafeDate(b.start_date) === dateStr)
-                            .sort((a, b) => getMinutes(a.start_time) - getMinutes(b.start_time));
+                            .filter(b => isDateInBookingRange(dateStr, b)) // Multi-day fix
+                            .sort((a, b) => {
+                                const aStart = dateStr === extractSafeDate(a.start_date) ? getMinutes(a.start_time) : 0;
+                                const bStart = dateStr === extractSafeDate(b.start_date) ? getMinutes(b.start_time) : 0;
+                                return aStart - bStart;
+                            });
                         
                         return (
                             <div 
@@ -558,7 +593,7 @@ export default function ScheduleDispatchPage() {
                                         return (
                                             <div 
                                                 key={b.booking_id}
-                                                draggable
+                                                draggable={b.start_date === b.end_date} // Only allow dragging single day events to avoid date math errors
                                                 onDragStart={(e) => {
                                                     e.dataTransfer.setData('booking_id', String(b.booking_id));
                                                     setTimeout(() => setDraggingId(String(b.booking_id)), 0);
@@ -566,14 +601,14 @@ export default function ScheduleDispatchPage() {
                                                 onDragEnd={() => setDraggingId(null)}
                                                 onClick={() => openModal(b)}
                                                 style={{ borderLeftColor: color, borderLeftWidth: '4px' }}
-                                                className={`border border-slate-300 rounded shadow-sm bg-white overflow-hidden cursor-grab active:cursor-grabbing hover:border-blue-400 transition-all ${draggingId === String(b.booking_id) ? 'opacity-50 scale-95' : ''}`}
+                                                className={`border border-slate-300 rounded shadow-sm bg-white overflow-hidden cursor-pointer hover:border-blue-400 transition-all ${draggingId === String(b.booking_id) ? 'opacity-50 scale-95' : ''}`}
                                             >
                                                 <div className="p-2 border-b flex items-start gap-1" style={{ backgroundColor: `${color}15` }}>
                                                     <GripVertical className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
                                                     <div className="w-full">
                                                         <div className="flex justify-between items-center mb-1 flex-wrap gap-1">
                                                             <span style={{ backgroundColor: color }} className={`text-[8px] text-white font-bold px-1 py-0.5 rounded uppercase tracking-wider w-max`}>{b.status}</span>
-                                                            <div className="flex items-center gap-1 text-[9px] font-bold text-slate-700 opacity-90"><Clock className="h-2.5 w-2.5"/>{b.start_time.substring(0,5)} - {b.end_time.substring(0,5)}</div>
+                                                            <div className="flex items-center gap-1 text-[9px] font-bold text-slate-700 opacity-90"><Clock className="h-2.5 w-2.5"/>{getDisplayTime(dateStr, b)}</div>
                                                         </div>
                                                         <h3 className="text-[11px] font-bold leading-tight line-clamp-2 text-slate-900">{b.title}</h3>
                                                     </div>
@@ -607,7 +642,7 @@ export default function ScheduleDispatchPage() {
         if (loading) return <div className="p-12 text-center text-slate-500">Loading schedule...</div>;
         
         const dateStr = formatDateYYYYMMDD(currentDate);
-        const dayEvents = bookings.filter(b => extractSafeDate(b.start_date) === dateStr);
+        const dayEvents = bookings.filter(b => isDateInBookingRange(dateStr, b)); // Multi-day fix
 
         const START_HOUR = 5; 
         const END_HOUR = 23;  
@@ -621,14 +656,21 @@ export default function ScheduleDispatchPage() {
             timeSlots.push(`${h}:30`);
         }
 
-        const sortedEvents = [...dayEvents].sort((a, b) => getMinutes(a.start_time) - getMinutes(b.start_time));
+        const sortedEvents = [...dayEvents].sort((a, b) => {
+            const aStart = dateStr === extractSafeDate(a.start_date) ? getMinutes(a.start_time) : 0;
+            const bStart = dateStr === extractSafeDate(b.start_date) ? getMinutes(b.start_time) : 0;
+            return aStart - bStart;
+        });
         const columns: any[][] = [];
         
         sortedEvents.forEach(ev => {
             let placed = false;
             for (let i = 0; i < columns.length; i++) {
                 const lastEvent = columns[i][columns[i].length - 1];
-                if (getMinutes(ev.start_time) >= getMinutes(lastEvent.end_time)) {
+                const lastEnd = dateStr === extractSafeDate(lastEvent.end_date) ? getMinutes(lastEvent.end_time) : 24 * 60;
+                const evStart = dateStr === extractSafeDate(ev.start_date) ? getMinutes(ev.start_time) : 0;
+
+                if (evStart >= lastEnd) {
                     columns[i].push(ev);
                     placed = true;
                     break;
@@ -659,8 +701,8 @@ export default function ScheduleDispatchPage() {
                     ))}
 
                     {sortedEvents.map(b => {
-                        let startMins = getMinutes(b.start_time);
-                        let endMins = getMinutes(b.end_time);
+                        let startMins = dateStr === extractSafeDate(b.start_date) ? getMinutes(b.start_time) : 0;
+                        let endMins = dateStr === extractSafeDate(b.end_date) ? getMinutes(b.end_time) : 24 * 60;
                         let durationMins = endMins - startMins;
                         if (durationMins <= 0) durationMins = 60; 
 
@@ -682,7 +724,7 @@ export default function ScheduleDispatchPage() {
                         return (
                             <div 
                                 key={b.booking_id} 
-                                draggable
+                                draggable={b.start_date === b.end_date} // Only allow dragging single day events to avoid date math errors
                                 onDragStart={(e) => {
                                     e.dataTransfer.setData('booking_id', String(b.booking_id));
                                     setTimeout(() => setDraggingId(String(b.booking_id)), 0);
@@ -699,7 +741,7 @@ export default function ScheduleDispatchPage() {
                                 }}
                                 className={`transition-all ${draggingId ? 'pointer-events-none' : ''} ${draggingId === String(b.booking_id) ? 'opacity-70 scale-[0.98]' : ''}`}
                             >
-                                <div style={{ borderLeftColor: color, borderLeftWidth: '4px' }} className="h-full w-full border border-slate-300 rounded-lg shadow-sm flex flex-col bg-white overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-400 transition-colors">
+                                <div style={{ borderLeftColor: color, borderLeftWidth: '4px' }} className="h-full w-full border border-slate-300 rounded-lg shadow-sm flex flex-col bg-white overflow-hidden cursor-pointer hover:shadow-md hover:border-blue-400 transition-colors">
                                     <div className="p-2 border-b flex items-start justify-between gap-2 shrink-0" style={{ backgroundColor: `${color}15` }}>
                                         <div className="flex items-start gap-1">
                                             <GripVertical className="h-4 w-4 text-slate-400 shrink-0 mt-0.5 cursor-grab" />
@@ -712,7 +754,7 @@ export default function ScheduleDispatchPage() {
                                             </div>
                                         </div>
                                         <div className="flex flex-col items-end gap-1 text-[10px] font-medium opacity-90 text-slate-700 shrink-0">
-                                            <div className="flex items-center gap-1"><Clock className="h-3 w-3"/> {b.start_time.substring(0,5)} - {b.end_time.substring(0,5)}</div>
+                                            <div className="flex items-center gap-1"><Clock className="h-3 w-3"/>{getDisplayTime(dateStr, b)}</div>
                                             <button onClick={() => openModal(b)} className="px-1.5 py-0.5 bg-white border border-slate-300 rounded shadow-sm hover:bg-slate-100 cursor-pointer pointer-events-auto relative z-20">EDIT</button>
                                         </div>
                                     </div>
@@ -796,7 +838,9 @@ export default function ScheduleDispatchPage() {
                 <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl my-8 flex flex-col">
                         <div className="p-5 bg-blue-600 text-white flex justify-between items-center rounded-t-xl sticky top-0 z-10">
-                            <h3 className="font-bold text-lg flex items-center gap-2"><Truck className="h-5 w-5"/> {selectedBooking ? 'Edit Job Order / Schedule' : 'Create Job Order'}</h3>
+                            <h3 className="font-bold text-lg flex items-center gap-2">
+                                <Truck className="h-5 w-5"/> {selectedBooking ? (form.booking_id === 0 ? 'Create Job Order (Duplicate)' : 'Edit Job Order / Schedule') : 'Create Job Order'}
+                            </h3>
                             <button type="button" onClick={() => setIsModalOpen(false)} className="hover:text-blue-200"><X className="h-6 w-6" /></button>
                         </div>
                         
@@ -856,6 +900,31 @@ export default function ScheduleDispatchPage() {
                                     </div>
                                 </div>
 
+                                {form.project_id > 0 && readyItems.length > 0 && (
+                                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                                        <div>
+                                            <h5 className="text-sm font-bold text-emerald-800 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                                <CheckCircle className="h-4 w-4" /> Ready on Loading Dock
+                                            </h5>
+                                            <p className="text-xs text-emerald-600">Production has staged {readyItems.length} physical parts for delivery.</p>
+                                        </div>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                const newItems = readyItems.map(ri => ({
+                                                    project_item_component_id: ri.project_item_component_id,
+                                                    custom_item_name: ri.parent_item_name + " - " + ri.part_name,
+                                                    qty_to_deliver: ri.available_qty
+                                                }));
+                                                setItems([...items, ...newItems]);
+                                            }}
+                                            className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded shadow-sm hover:bg-emerald-700 transition-colors"
+                                        >
+                                            Auto-Load Truck
+                                        </button>
+                                    </div>
+                                )}
+
                                 <table className="w-full text-left text-sm mb-3">
                                     <thead className="bg-slate-50 text-slate-600">
                                         <tr>
@@ -870,8 +939,23 @@ export default function ScheduleDispatchPage() {
                                                 <td className="p-1.5 border">
                                                     {form.project_id > 0 ? (
                                                         <select value={item.project_item_component_id} onChange={(e) => { const newItems = [...items]; newItems[idx].project_item_component_id = parseInt(e.target.value); setItems(newItems); }} className="w-full p-2 border border-slate-200 rounded outline-none">
-                                                            <option value={0}>Select BOM Component...</option>
-                                                            {projectComponents.map(pc => <option key={pc.project_item_component_id} value={pc.project_item_component_id}>{pc.inventory_name}</option>)}
+                                                            <option value={0}>Select Deliverable...</option>
+                                                            
+                                                            {readyItems.length > 0 && (
+                                                                <optgroup label="Finished Parts (Ready in Prod)">
+                                                                    {readyItems.map(ri => (
+                                                                        <option key={ri.project_item_component_id} value={ri.project_item_component_id}>
+                                                                            {ri.parent_item_name} - {ri.part_name} (Avail: {ri.available_qty} {ri.uom_abbr})
+                                                                        </option>
+                                                                    ))}
+                                                                </optgroup>
+                                                            )}
+                                                            
+                                                            {projectComponents.length > 0 && (
+                                                                <optgroup label="All Project Parts (Raw List)">
+                                                                    {projectComponents.map(pc => <option key={pc.project_item_component_id} value={pc.project_item_component_id}>{pc.part_name}</option>)}
+                                                                </optgroup>
+                                                            )}
                                                         </select>
                                                     ) : (
                                                         <input type="text" value={item.custom_item_name} onChange={(e) => { const newItems = [...items]; newItems[idx].custom_item_name = e.target.value; setItems(newItems); }} placeholder="Enter item name manually..." className="w-full p-2 border border-slate-200 rounded outline-none" />
@@ -928,19 +1012,27 @@ export default function ScheduleDispatchPage() {
 
                             {/* Action Footer */}
                             <div className="flex justify-between gap-3 pt-4 border-t border-slate-200 mt-4">
-                                <div>
+                                <div className="flex gap-3">
                                     {/* Print Job Order Report (Phase 4) */}
                                     {form.booking_id > 0 && (
                                         <button type="button" onClick={handlePrintReport} className="px-5 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-100 transition-colors flex items-center gap-2">
                                             <Printer className="h-4 w-4"/> Print JO Report
                                         </button>
                                     )}
+
+                                    {/* NEW: Duplicate Schedule Button */}
+                                    {form.booking_id > 0 && (
+                                        <button type="button" onClick={handleDuplicate} className="px-5 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-100 transition-colors flex items-center gap-2">
+                                            <Copy className="h-4 w-4"/> Duplicate Schedule
+                                        </button>
+                                    )}
                                 </div>
+                                
                                 <div className="flex gap-3">
                                     <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-100 transition-colors">Cancel</button>
                                     <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"><Save className="h-4 w-4"/> Save Job Order</button>
                                     
-                                    {/* NEW: Bridge Button to Delivery System */}
+                                    {/* Bridge Button to Delivery System */}
                                     {form.booking_id > 0 && form.status === 'Scheduled' && (
                                         <button 
                                             type="button" 

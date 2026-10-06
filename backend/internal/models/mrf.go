@@ -304,32 +304,28 @@ func FulfillMRF(req FulfillMRFRequest) error {
 		return err
 	}
 
-	allFullyIssued := true
-	anyIssued := false
-
 	for _, item := range req.Items {
+		// 1. Update MRF Item dynamically via SQL
+		// FIX: Since MySQL updates sequentially, 'qty_issued' in the lower lines
+		// now safely refers to the freshly calculated total.
+		_, err = tx.Exec(`
+			UPDATE tbl_mrf_items 
+			SET 
+				inventory_id = ?, 
+				qty_issued = qty_issued + ?, 
+				qty_backordered = GREATEST(0, qty_requested - qty_issued), 
+				procurement_flag = CASE WHEN qty_requested > qty_issued THEN 1 ELSE 0 END,
+				status = CASE WHEN qty_issued >= qty_requested THEN 'Completed' ELSE 'Partially Issued' END
+			WHERE mrf_item_id = ?`,
+			item.InventoryID, item.QtyIssued, item.MRFItemID) // Only need to pass QtyIssued once now!
 
-		// 1. Calculate Backorders and Procurement Flags
-		qtyBackordered := item.QtyRequested - item.QtyIssued
-		procurementFlag := 0
-
-		if qtyBackordered > 0 {
-			procurementFlag = 1 // Flag for Purchasing Department!
-			allFullyIssued = false
-		}
-		if item.QtyIssued > 0 {
-			anyIssued = true
-		}
-
-		// 2. Update MRF Item with Mapped Inventory, Issued Qty, and PO Routing Flags
-		_, err = tx.Exec(`UPDATE tbl_mrf_items SET inventory_id = ?, qty_issued = ?, qty_backordered = ?, procurement_flag = ? WHERE mrf_item_id = ?`,
-			item.InventoryID, item.QtyIssued, qtyBackordered, procurementFlag, item.MRFItemID)
 		if err != nil {
 			tx.Rollback()
+			log.Printf("❌ DB Error Updating MRF Item: %v\n", err)
 			return err
 		}
 
-		// 3. Deduct Inventory & Log to Enterprise Ledger
+		// 2. Deduct Inventory & Log to Enterprise Ledger
 		if item.QtyIssued > 0 {
 			// Deduct from Master Inventory
 			_, err = tx.Exec(`UPDATE tbl_inventory SET qty_on_hand = qty_on_hand - ? WHERE inventory_id = ?`, item.QtyIssued, item.InventoryID)
@@ -350,12 +346,30 @@ func FulfillMRF(req FulfillMRFRequest) error {
 		}
 	}
 
-	// 4. Update the Parent MRF Status
-	mrfStatus := "Approved"
-	if !allFullyIssued && anyIssued {
-		mrfStatus = "Partial"
-	} else if !anyIssued {
-		mrfStatus = "Pending PO"
+	// 3. Dynamically determine Parent MRF Status based on the real updated DB state
+	var pendingCount, totalCount, unissuedCount int
+
+	err = tx.QueryRow(`
+		SELECT 
+			COUNT(*), 
+			COALESCE(SUM(CASE WHEN qty_issued < qty_requested THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN qty_issued = 0 THEN 1 ELSE 0 END), 0)
+		FROM tbl_mrf_items 
+		WHERE mrf_id = ?`, req.MRFID).Scan(&totalCount, &pendingCount, &unissuedCount)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Determine final status
+	mrfStatus := "Completed"
+	if pendingCount > 0 {
+		if unissuedCount == totalCount {
+			mrfStatus = "Pending PO" // Nothing has been issued at all
+		} else {
+			mrfStatus = "Partial" // Some items issued, some still waiting on PO
+		}
 	}
 
 	_, err = tx.Exec(`UPDATE tbl_mrf SET status = ?, approved_by = ? WHERE mrf_id = ?`, mrfStatus, req.ApprovedBy, req.MRFID)

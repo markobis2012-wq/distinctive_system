@@ -2,7 +2,6 @@ package models
 
 import (
 	"backend/internal/config"
-	"errors"
 )
 
 type DeliveryItem struct {
@@ -16,40 +15,33 @@ type DeliveryItem struct {
 }
 
 type AvailableProjectItem struct {
-	ProjectItemID int    `json:"project_items_id"`
-	ProductName   string `json:"product_name"`
-	Qty           int    `json:"qty"`
-	Pending       int    `json:"pending"`
-	UOMAbbr       string `json:"uom_abbr"`
+	ProjectItemComponentID int     `json:"project_item_component_id"`
+	ParentItemName         string  `json:"parent_item_name"`
+	PartName               string  `json:"part_name"`
+	ProdQty                float64 `json:"prod_qty"`      // Total project target for this part
+	ReadyQty               float64 `json:"ready_qty"`     // (Parent Ready * Qty Per Item)
+	AvailableQty           float64 `json:"available_qty"` // Ready - Already Scheduled
+	UOMAbbr                string  `json:"uom_abbr"`
 }
 
 // Fetches items currently inside a specific Delivery Receipt
 // Replace your old GetDeliveryItems with this unified master query!
-func GetDeliveryItems(deliveryID int) ([]LoadingListItem, error) {
+func GetDeliveryItems(deliveryID int) ([]DeliveryItemRecord, error) {
 	query := `
 		SELECT 
-			a.delivery_item_id, a.delivery_id, COALESCE(a.project_item_id, 0), COALESCE(a.project_item_component_id, 0), COALESCE(a.deliver_qty, 0),
-			
-			-- Parent Info
-			COALESCE(d.product_name, ''), COALESCE(d.dbos_image_path, ''), COALESCE(d.product_description, ''),
-			
-			-- Component Info (Injecting inventory_name to fallback nicely)
-			COALESCE(inv.inventory_name, e.supplier_product_name, ''), 
-			COALESCE(inv.description, e.prod_description, ''), 
-			COALESCE(inv.image_path, e.product_image, ''),
-			COALESCE(f.uom_abbr, ''),
-
-			-- UI Name & Image
-			COALESCE(inv.inventory_name, e.supplier_product_name, d.product_name, a.remarks, 'Unknown Item'),
+			a.delivery_item_id, 
+			a.delivery_id, 
+			COALESCE(a.project_item_component_id, 0),
+			COALESCE(pi.product_name, 'General Delivery'),
+			COALESCE(c.part_name, a.remarks, 'Unknown Part'),
 			COALESCE(a.deliver_qty, 0),
-			COALESCE(inv.image_path, e.product_image, d.dbos_image_path, d.image_path, '')
-
+			COALESCE(a.remarks, ''),
+			COALESCE(u.uom_abbr, ''),
+			COALESCE(pi.image_path, '')
 		FROM tbl_delivery_item a
-		LEFT JOIN tbl_project_item_component c ON c.project_item_component_id = a.project_item_component_id
-		LEFT JOIN tbl_project_items d ON d.project_items_id = a.project_item_id
-		LEFT JOIN tbl_supplier_products e ON e.supplier_product_id = c.supplier_product_id
-		LEFT JOIN tbl_inventory inv ON inv.inventory_id = c.inventory_id
-		LEFT JOIN tbl_uom f ON f.uom_id = d.uom
+		LEFT JOIN tbl_project_item_component c ON a.project_item_component_id = c.project_item_component_id
+		LEFT JOIN tbl_project_items pi ON c.project_items_id = pi.project_items_id OR a.project_item_id = pi.project_items_id
+		LEFT JOIN tbl_uom u ON c.uom_id = u.uom_id
 		WHERE a.delivery_id = ?
 		ORDER BY a.delivery_item_id ASC`
 
@@ -59,37 +51,43 @@ func GetDeliveryItems(deliveryID int) ([]LoadingListItem, error) {
 	}
 	defer rows.Close()
 
-	var items []LoadingListItem
+	var items []DeliveryItemRecord
 	for rows.Next() {
-		var i LoadingListItem
-		rows.Scan(
-			&i.LoadingListID, &i.DeliveryID, &i.ProjectItemID, &i.ProjectItemComponentID, &i.ItemQty,
-			&i.ProductName, &i.ItemImage, &i.ItemDesc, &i.ComponentName, &i.ComponentDesc, &i.ComponentImage, &i.UOMAbbr,
-			&i.ItemName, &i.Qty, &i.ImagePath,
-		)
-		items = append(items, i)
+		var i DeliveryItemRecord
+		if err := rows.Scan(&i.DeliveryItemID, &i.DeliveryID, &i.ProjectItemComponentID, &i.ProductName, &i.ItemName, &i.Qty, &i.Remarks, &i.UOMAbbr, &i.ImagePath); err == nil {
+			items = append(items, i)
+		}
 	}
 	if items == nil {
-		items = []LoadingListItem{}
+		items = []DeliveryItemRecord{}
 	}
 	return items, nil
 }
 
 // Fetches Project Items for the dropdown
 func GetAvailableProjectItems(projectID int) ([]AvailableProjectItem, error) {
-	// Removed the 'WHERE pending > 0' constraint so ALL items show up
 	query := `
 		SELECT * FROM (
 			SELECT 
-				pi.project_items_id, 
-				COALESCE(pi.product_name, ''), 
-				COALESCE(pi.qty, 0) AS qty,
-				(COALESCE(pi.qty, 0) - COALESCE((SELECT SUM(deliver_qty) FROM tbl_delivery_item WHERE project_item_id = pi.project_items_id), 0)) AS pending,
+				c.project_item_component_id,
+				COALESCE(pi.product_name, '') AS parent_item_name,
+				COALESCE(c.part_name, '') AS part_name,
+				COALESCE(c.prod_qty, 0) AS prod_qty,
+				(COALESCE(pi.qty_ready_for_delivery, 0) * COALESCE(c.qty_per_item, 1)) AS ready_qty,
+				((COALESCE(pi.qty_ready_for_delivery, 0) * COALESCE(c.qty_per_item, 1)) - COALESCE((
+					SELECT SUM(sbi.qty_to_deliver)
+					FROM tbl_schedule_booking_items sbi
+					JOIN tbl_schedule_bookings sb ON sbi.booking_id = sb.booking_id
+					WHERE sbi.project_item_component_id = c.project_item_component_id
+					AND sb.status IN ('Scheduled', 'In Transit')
+				), 0)) AS available_qty,
 				COALESCE(u.uom_abbr, '') AS uom_abbr
-			FROM tbl_project_items pi
-			LEFT JOIN tbl_uom u ON u.uom_id = pi.uom
+			FROM tbl_project_item_component c
+			JOIN tbl_project_items pi ON c.project_items_id = pi.project_items_id
+			LEFT JOIN tbl_uom u ON u.uom_id = c.uom_id
 			WHERE pi.project_id = ?
-		) AS subquery`
+		) AS subquery
+		WHERE available_qty > 0`
 
 	rows, err := config.DB.Query(query, projectID)
 	if err != nil {
@@ -101,7 +99,7 @@ func GetAvailableProjectItems(projectID int) ([]AvailableProjectItem, error) {
 	var items []AvailableProjectItem
 	for rows.Next() {
 		var i AvailableProjectItem
-		if err := rows.Scan(&i.ProjectItemID, &i.ProductName, &i.Qty, &i.Pending, &i.UOMAbbr); err == nil {
+		if err := rows.Scan(&i.ProjectItemComponentID, &i.ParentItemName, &i.PartName, &i.ProdQty, &i.ReadyQty, &i.AvailableQty, &i.UOMAbbr); err == nil {
 			items = append(items, i)
 		}
 	}
@@ -113,18 +111,16 @@ func GetAvailableProjectItems(projectID int) ([]AvailableProjectItem, error) {
 }
 
 // Insert Item with Strict Verification
-func AddDeliveryItem(deliveryID int, projectItemID int, deliverQty int, remarks string) error {
-	// Verify Pending Logic Backend-Side
-	var pending int
-	config.DB.QueryRow(`
-		SELECT (qty - COALESCE((SELECT SUM(deliver_qty) FROM tbl_delivery_item WHERE project_item_id = ?), 0)) 
-		FROM tbl_project_items WHERE project_items_id = ?`, projectItemID, projectItemID).Scan(&pending)
+func AddDeliveryItem(p AddDeliveryItemPayload) error {
+	// Fetch the parent project_items_id to maintain legacy column integrity
+	var parentID int
+	config.DB.QueryRow("SELECT project_items_id FROM tbl_project_item_component WHERE project_item_component_id = ?", p.ProjectItemComponentID).Scan(&parentID)
 
-	if deliverQty > pending {
-		return errors.New("delivery quantity exceeds pending amount")
-	}
-
-	_, err := config.DB.Exec("INSERT INTO tbl_delivery_item (delivery_id, project_item_id, deliver_qty, remarks) VALUES (?, ?, ?, ?)", deliveryID, projectItemID, deliverQty, remarks)
+	_, err := config.DB.Exec(`
+		INSERT INTO tbl_delivery_item 
+		(delivery_id, project_item_id, project_item_component_id, deliver_qty, remarks) 
+		VALUES (?, ?, ?, ?, ?)`,
+		p.DeliveryID, parentID, p.ProjectItemComponentID, p.DeliverQty, p.Remarks)
 	return err
 }
 
@@ -153,4 +149,23 @@ func GetDeliveryByID(id int) (Delivery, error) {
 		&d.DeliveryID, &d.DeliveryDate, &d.ProjectID, &d.DeliveryNo, &d.IsLoadingList,
 		&d.ProjectName, &d.ProjectNumber, &d.CompanyName, &d.ContractAmount)
 	return d, err
+}
+
+type DeliveryItemRecord struct {
+	DeliveryItemID         int     `json:"delivery_item_id"`
+	DeliveryID             int     `json:"delivery_id"`
+	ProjectItemComponentID int     `json:"project_item_component_id"`
+	ProductName            string  `json:"product_name"` // Parent item
+	ItemName               string  `json:"item_name"`    // Component part
+	Qty                    float64 `json:"qty"`
+	Remarks                string  `json:"remarks"`
+	UOMAbbr                string  `json:"uom_abbr"`
+	ImagePath              string  `json:"image_path"`
+}
+
+type AddDeliveryItemPayload struct {
+	DeliveryID             int     `json:"delivery_id"`
+	ProjectItemComponentID int     `json:"project_item_component_id"`
+	DeliverQty             float64 `json:"deliver_qty"`
+	Remarks                string  `json:"remarks"`
 }

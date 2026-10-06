@@ -4,6 +4,7 @@ import (
 	"backend/internal/config"
 	"fmt"
 	"log"
+	"time"
 )
 
 type IncomingPOItem struct {
@@ -70,8 +71,8 @@ func UpdatePOETA(poNumber string, eta string) error {
 	return err
 }
 
-// THE LEDGER HANDSHAKE: Receives the PO and adds to Master Inventory via Unified Ledger
-func ReceiveGoods(poItemID int, qtyReceived float64) error {
+// THE LEDGER HANDSHAKE: Receives the PO, creates GRN, and adds to Master Inventory
+func ReceiveGoods(poItemID int, qtyReceived float64, username string) error {
 	tx, err := config.DB.Begin()
 	if err != nil {
 		return err
@@ -81,6 +82,7 @@ func ReceiveGoods(poItemID int, qtyReceived float64) error {
 	var orderedQty, currentReceivedQty float64
 	var poNumber string
 
+	// Get the required IDs and current quantities
 	err = tx.QueryRow(`
 		SELECT mi.inventory_id, poi.qty, poi.received_qty, po.po_number, po.po_id
 		FROM tbl_po_items poi
@@ -94,13 +96,35 @@ func ReceiveGoods(poItemID int, qtyReceived float64) error {
 		return fmt.Errorf("failed to find linked inventory item: %v", err)
 	}
 
+	// 1. CREATE GRN HEADER
+	grnNumber := fmt.Sprintf("GRN-%d-%d", time.Now().Unix(), poID)
+	res, err := tx.Exec(`
+		INSERT INTO tbl_grn (po_id, grn_number, receive_date, received_by, status) 
+		VALUES (?, ?, CURDATE(), ?, 'Completed')`, poID, grnNumber, username)
+	if err != nil {
+		tx.Rollback()
+		log.Printf("❌ ERROR in ReceiveGoods (GRN Header Insert): %v\n", err)
+		return err
+	}
+	grnID, _ := res.LastInsertId()
+
+	// 2. CREATE GRN LINE ITEM
+	_, err = tx.Exec(`
+		INSERT INTO tbl_grn_items (grn_id, po_item_id, qty_received) 
+		VALUES (?, ?, ?)`, grnID, poItemID, qtyReceived)
+	if err != nil {
+		tx.Rollback()
+		log.Printf("❌ ERROR in ReceiveGoods (GRN Item Insert): %v\n", err)
+		return err
+	}
+
+	// 3. UPDATE PO ITEM STATUS
 	newTotalReceived := currentReceivedQty + qtyReceived
 	status := "Partially Received"
 	if newTotalReceived >= orderedQty {
 		status = "Fully Received"
 	}
 
-	// 1. Update PO Item Status
 	_, err = tx.Exec(`UPDATE tbl_po_items SET received_qty = ?, status = ? WHERE po_item_id = ?`, newTotalReceived, status, poItemID)
 	if err != nil {
 		tx.Rollback()
@@ -108,7 +132,7 @@ func ReceiveGoods(poItemID int, qtyReceived float64) error {
 		return err
 	}
 
-	// 2. Update Master Inventory
+	// 4. UPDATE MASTER INVENTORY
 	_, err = tx.Exec(`UPDATE tbl_inventory SET qty_on_hand = qty_on_hand + ? WHERE inventory_id = ?`, qtyReceived, inventoryID)
 	if err != nil {
 		tx.Rollback()
@@ -116,8 +140,9 @@ func ReceiveGoods(poItemID int, qtyReceived float64) error {
 		return err
 	}
 
-	// 3. Record to Ledger (Type 2 = PO_RECEIPT)
-	remarks := fmt.Sprintf("Received via %s", poNumber)
+	// 5. RECORD TO LEDGER (Type 2 = PO_RECEIPT)
+	// We note the newly generated GRN number in the remarks for auditing
+	remarks := fmt.Sprintf("Received via %s (PO: %s)", grnNumber, poNumber)
 	_, err = tx.Exec(`
 		INSERT INTO tbl_inventory_ledger 
 		(inventory_id, transaction_type_id, qty_change, reference_id, destination, status, remarks) 

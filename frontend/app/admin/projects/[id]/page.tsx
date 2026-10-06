@@ -505,13 +505,26 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                                                     <th className="px-4 py-3 font-medium">Images</th>
                                                     <th className="px-4 py-3 font-medium">Finished Good Name</th>
                                                     <th className="px-4 py-3 font-medium text-center">Project Qty</th>
+                                                    <th className="px-4 py-3 font-medium min-w-[200px]">Status & Progress</th>
                                                     <th className="px-4 py-3 font-medium text-right">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {!projectItems || projectItems.length === 0 ? (
-                                                    <tr><td colSpan={4} className="px-4 py-12 text-center text-slate-400 italic">No deliverable items added yet.</td></tr>
-                                                ) : projectItems.map(item => (
+                                                    <tr><td colSpan={5} className="px-4 py-12 text-center text-slate-400 italic">No deliverable items added yet.</td></tr>
+                                                ) : projectItems.map(item => {
+                                                    
+                                                    // Calculation for progress tracking
+                                                    const total = item.qty > 0 ? item.qty : 1;
+                                                    const inProd = parseFloat(item.qty_in_production) || 0;
+                                                    const ready = parseFloat(item.qty_ready_for_delivery) || 0;
+                                                    const delivered = parseFloat(item.qty_delivered) || 0;
+                                                    
+                                                    const prodPct = (inProd / total) * 100;
+                                                    const readyPct = (ready / total) * 100;
+                                                    const delPct = (delivered / total) * 100;
+
+                                                    return (
                                                     <tr key={item.project_items_id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                                                         <td className="px-4 py-2 flex gap-2">
                                                             {item.image_path ? <img src={`${API_URL}${item.image_path}`} onClick={() => setEnlargedImage(`${API_URL}${item.image_path}`)} alt="Req" className="h-10 w-10 object-cover rounded border cursor-zoom-in" /> : <div className="h-10 w-10 bg-slate-100 rounded border flex items-center justify-center"><ImageIcon className="h-4 w-4 text-slate-300" /></div>}
@@ -524,15 +537,29 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                                                         <td className="px-4 py-3 text-center font-bold text-blue-600 text-lg">
                                                             {item.qty} <span className="text-xs font-normal text-slate-400">{item.uom_abbr || 'Units'}</span>
                                                         </td>
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex flex-col gap-1 w-full text-[11px]">
+                                                                <div className="flex justify-between items-center"><span className="text-orange-600 font-bold uppercase tracking-wider">In Production</span> <span className="font-bold text-slate-800">{inProd}</span></div>
+                                                                <div className="flex justify-between items-center"><span className="text-blue-600 font-bold uppercase tracking-wider">Staged/Ready</span> <span className="font-bold text-slate-800">{ready}</span></div>
+                                                                <div className="flex justify-between items-center"><span className="text-emerald-600 font-bold uppercase tracking-wider">Delivered</span> <span className="font-bold text-slate-800">{delivered}</span></div>
+                                                                
+                                                                {/* Visual Progress Bar */}
+                                                                <div className="w-full h-1.5 bg-slate-200 rounded-full mt-1.5 flex overflow-hidden">
+                                                                    <div style={{ width: `${delPct}%` }} className="bg-emerald-500 h-full" title="Delivered"></div>
+                                                                    <div style={{ width: `${readyPct}%` }} className="bg-blue-500 h-full" title="Ready"></div>
+                                                                    <div style={{ width: `${prodPct}%` }} className="bg-orange-400 h-full" title="In Production"></div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
                                                         <td className="px-4 py-3 text-right">
                                                             <div className="flex justify-end gap-2">
-                                                                <button onClick={() => setActiveItemForParts(item)} className="text-emerald-600 hover:text-emerald-800 p-1.5 bg-emerald-50 hover:bg-emerald-100 rounded flex items-center gap-1 text-xs font-bold" title="Manage Loading Parts"><Package className="h-4 w-4" /> Parts List</button>
+                                                                <button onClick={() => setActiveItemForParts(item)} className="text-emerald-600 hover:text-emerald-800 p-1.5 bg-emerald-50 hover:bg-emerald-100 rounded flex items-center gap-1 text-xs font-bold" title="Manage Loading Parts"><Package className="h-4 w-4" /> Parts</button>
                                                                 <button onClick={() => openItemModal(item)} className="text-blue-600 hover:text-blue-800 p-1.5 bg-blue-50 hover:bg-blue-100 rounded"><Edit2 className="h-4 w-4" /></button>
                                                                 <button onClick={() => handleDeleteItem(item.project_items_id)} className="text-red-600 hover:text-red-800 p-1.5 bg-red-50 hover:bg-red-100 rounded"><Trash2 className="h-4 w-4" /></button>
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                ))}
+                                                )})}
                                             </tbody>
                                         </table>
                                     </div>
