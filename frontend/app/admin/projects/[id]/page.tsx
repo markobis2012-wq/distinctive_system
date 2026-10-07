@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." }: any) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -142,20 +142,20 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         const fetchData = async () => {
             try {
                 const [compRes, bidRes, deptRes, catRes, projRes, itemsRes, typesRes, attachRes, mrfRes, invRes, currRes, uomRes, partsRes, bomRes] = await Promise.all([
-                    fetch(`${API_URL}/api/companies`).catch(() => null),
-                    fetch(`${API_URL}/api/biddings?limit=1000`).catch(() => null),
-                    fetch(`${API_URL}/api/departments`).catch(() => null),
-                    fetch(`${API_URL}/api/project-categories`).catch(() => null),
-                    fetch(`${API_URL}/api/projects/${projectId}`).catch(() => null),
-                    fetch(`${API_URL}/api/projects/${projectId}/items`).catch(() => null),
-                    fetch(`${API_URL}/api/attachment-types`).catch(() => null),
-                    fetch(`${API_URL}/api/projects/${projectId}/attachments`).catch(() => null),
-                    fetch(`${API_URL}/api/projects/${projectId}/mrfs`).catch(() => null),
-                    fetch(`${API_URL}/api/inventory`).catch(() => null),
-                    fetch(`${API_URL}/api/currencies`).catch(() => null),
-                    fetch(`${API_URL}/api/uoms`).catch(() => null),
-                    fetch(`${API_URL}/api/projects/${projectId}/parts`).catch(() => null),
-                    fetch(`${API_URL}/api/projects/${projectId}/bom`).catch(() => null)
+                    fetch('/api/companies').catch(() => null),
+                    fetch('/api/biddings?limit=1000').catch(() => null),
+                    fetch('/api/departments').catch(() => null),
+                    fetch('/api/project-categories').catch(() => null),
+                    fetch(`/api/projects/${projectId}`).catch(() => null),
+                    fetch(`/api/projects/${projectId}/items`).catch(() => null),
+                    fetch('/api/attachment-types').catch(() => null),
+                    fetch(`/api/projects/${projectId}/attachments`).catch(() => null),
+                    fetch(`/api/projects/${projectId}/mrfs`).catch(() => null),
+                    fetch('/api/inventory').catch(() => null),
+                    fetch('/api/currencies').catch(() => null),
+                    fetch('/api/uoms').catch(() => null),
+                    fetch(`/api/projects/${projectId}/parts`).catch(() => null),
+                    fetch(`/api/projects/${projectId}/bom`).catch(() => null)
                 ]);
 
                 if (compRes) setCompanies(await safeParse(compRes) || []);
@@ -195,14 +195,14 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         e.preventDefault();
         setSaving(true);
         try {
-            await fetch(`${API_URL}/api/projects/${projectId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+            await fetch(`/api/projects/${projectId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
             alert("Project details updated successfully!");
         } catch (err) { alert("Error saving project."); } finally { setSaving(false); }
     };
 
     // --- ITEM HANDLERS ---
     const fetchProjectItems = async () => {
-        const res = await fetch(`${API_URL}/api/projects/${projectId}/items`);
+        const res = await fetch(`/api/projects/${projectId}/items`);
         setProjectItems(await safeParse(res) || []);
     };
 
@@ -224,7 +224,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         if (itemImage) formData.append('image_path', itemImage);
         if (dbosImage) formData.append('dbos_image_path', dbosImage);
 
-        const url = editingItemId ? `${API_URL}/api/projects/${projectId}/items/${editingItemId}` : `${API_URL}/api/projects/${projectId}/items`;
+        const url = editingItemId ? `/api/projects/${projectId}/items/${editingItemId}` : `/api/projects/${projectId}/items`;
         try {
             const res = await fetch(url, { method: editingItemId ? 'PUT' : 'POST', body: formData });
             if (res.ok) { setIsItemModalOpen(false); fetchProjectItems(); }
@@ -234,14 +234,14 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
     const handleDeleteItem = async (id: number) => {
         if (!confirm("Delete this deliverable item?")) return;
         try {
-            const res = await fetch(`${API_URL}/api/projects/items/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/projects/items/${id}`, { method: 'DELETE' });
             if (res.ok) fetchProjectItems();
         } catch (err) { }
     };
 
     // --- PARTS LIST HANDLERS ---
     const fetchParts = async () => {
-        const res = await fetch(`${API_URL}/api/projects/${projectId}/parts`);
+        const res = await fetch(`/api/projects/${projectId}/parts`);
         setProjectPartsList(await safeParse(res) || []);
     };
 
@@ -250,7 +250,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         const prodQty = (activeItemForParts?.qty || 1) * partsForm.qty_per_item;
         
         try {
-            const res = await fetch(`${API_URL}/api/project-items/parts`, {
+            const res = await fetch('/api/project-items/parts', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ project_items_id: activeItemForParts.project_items_id, ...partsForm, prod_qty: prodQty })
             });
@@ -264,14 +264,14 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
     const handleDeletePart = async (id: number) => {
         if (!confirm("Delete this part? This will remove it from the loading list.")) return;
         try {
-            const res = await fetch(`${API_URL}/api/project-items/parts/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/project-items/parts/${id}`, { method: 'DELETE' });
             if (res.ok) fetchParts();
         } catch (err) {}
     };
 
     // --- MASTER BOM HANDLERS WITH COST ALLOCATION ---
     const fetchMasterBOM = async () => {
-        const res = await fetch(`${API_URL}/api/projects/${projectId}/bom`);
+        const res = await fetch(`/api/projects/${projectId}/bom`);
         setMasterBOMList(await safeParse(res) || []);
     };
 
@@ -310,7 +310,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         };
 
         try {
-            const res = await fetch(`${API_URL}/api/projects/${projectId}/bom`, {
+            const res = await fetch(`/api/projects/${projectId}/bom`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
             });
             if (res.ok) {
@@ -326,7 +326,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
     const handleDeleteBOM = async (id: number) => {
         if (!confirm("Delete this material from the Master BOM?")) return;
         try {
-            const res = await fetch(`${API_URL}/api/projects/bom/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/projects/bom/${id}`, { method: 'DELETE' });
             if (res.ok) fetchMasterBOM();
         } catch (err) {}
     };
@@ -334,7 +334,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
     // --- MRF HANDLERS ---
     const fetchMRFs = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/projects/${projectId}/mrfs`);
+            const res = await fetch(`/api/projects/${projectId}/mrfs`);
             if (res.ok) setMrfList(await res.json());
         } catch (err) {}
     };
@@ -360,7 +360,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         if (validItems.length === 0) return alert("Please map at least one valid BOM material to request.");
 
         try {
-            const res = await fetch(`${API_URL}/api/projects/${projectId}/mrfs`, {
+            const res = await fetch(`/api/projects/${projectId}/mrfs`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ date_requested: mrfForm.date_requested, requested_by: mrfForm.requested_by, items: validItems })
             });
@@ -376,7 +376,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
     const openMRFView = async (mrf: any) => {
         setViewingMrf(mrf);
         try {
-            const res = await fetch(`${API_URL}/api/warehouse/mrfs/${mrf.mrf_id}/items`);
+            const res = await fetch(`/api/warehouse/mrfs/${mrf.mrf_id}/items`);
             const data = await safeParse(res);
             if (data) setMrfDetails(data);
         } catch (err) { console.error(err); }
@@ -384,7 +384,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
 
     // --- ATTACHMENT HANDLERS ---
     const fetchAttachments = async () => {
-        const res = await fetch(`${API_URL}/api/projects/${projectId}/attachments`);
+        const res = await fetch(`/api/projects/${projectId}/attachments`);
         const data = await safeParse(res);
         if (data) setAttachments(data);
     };
@@ -400,7 +400,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
         formData.append('file', attachFile);
 
         try {
-            const res = await fetch(`${API_URL}/api/projects/${projectId}/attachments`, { method: 'POST', body: formData });
+            const res = await fetch(`/api/projects/${projectId}/attachments`, { method: 'POST', body: formData });
             if (res.ok) { setIsUploadModalOpen(false); setAttachForm({ file_type_id: 0, has_expiration: 0, expiration_date: '', version: '' }); setAttachFile(null); fetchAttachments(); } else { alert("Failed to upload"); }
         } catch (err) { }
     };
@@ -408,14 +408,14 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
     const handleDeleteAttachment = async (id: number) => {
         if (!confirm("Delete this attachment?")) return;
         try {
-            const res = await fetch(`${API_URL}/api/projects/attachments/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/projects/attachments/${id}`, { method: 'DELETE' });
             if (res.ok) fetchAttachments();
         } catch (err) { }
     };
 
     const handlePreviewFile = (filePath: string, fileName: string) => {
         const ext = fileName.split('.').pop()?.toLowerCase() || '';
-        const url = `${API_URL}${filePath}`;
+        const url = `${filePath}`;
         if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) { setPreviewFile({ url, type: 'image', name: fileName }); } else if (ext === 'pdf') { setPreviewFile({ url, type: 'pdf', name: fileName }); } else { const link = document.createElement('a'); link.href = url; link.target = '_blank'; link.download = fileName; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
     };
 
@@ -527,8 +527,8 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                                                     return (
                                                     <tr key={item.project_items_id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                                                         <td className="px-4 py-2 flex gap-2">
-                                                            {item.image_path ? <img src={`${API_URL}${item.image_path}`} onClick={() => setEnlargedImage(`${API_URL}${item.image_path}`)} alt="Req" className="h-10 w-10 object-cover rounded border cursor-zoom-in" /> : <div className="h-10 w-10 bg-slate-100 rounded border flex items-center justify-center"><ImageIcon className="h-4 w-4 text-slate-300" /></div>}
-                                                            {item.dbos_image_path ? <img src={`${API_URL}${item.dbos_image_path}`} onClick={() => setEnlargedImage(`${API_URL}${item.dbos_image_path}`)} alt="DBOS" className="h-10 w-10 object-cover rounded border cursor-zoom-in" /> : <div className="h-10 w-10 bg-slate-100 rounded border flex items-center justify-center"><ImageIcon className="h-4 w-4 text-slate-300" /></div>}
+                                                            {item.image_path ? <img src={`${item.image_path}`} onClick={() => setEnlargedImage(`${item.image_path}`)} alt="Req" className="h-10 w-10 object-cover rounded border cursor-zoom-in" /> : <div className="h-10 w-10 bg-slate-100 rounded border flex items-center justify-center"><ImageIcon className="h-4 w-4 text-slate-300" /></div>}
+                                                            {item.dbos_image_path ? <img src={`${item.dbos_image_path}`} onClick={() => setEnlargedImage(`${item.dbos_image_path}`)} alt="DBOS" className="h-10 w-10 object-cover rounded border cursor-zoom-in" /> : <div className="h-10 w-10 bg-slate-100 rounded border flex items-center justify-center"><ImageIcon className="h-4 w-4 text-slate-300" /></div>}
                                                         </td>
                                                         <td className="px-4 py-3">
                                                             <div className="font-bold text-slate-800">{item.product_name}</div>

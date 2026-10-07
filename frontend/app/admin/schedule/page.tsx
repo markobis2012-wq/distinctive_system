@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Plus, MapPin, Clock, Truck, Users, Trash2, PackagePlus, UserPlus, X, Save, GripVertical, Printer, CheckCircle, Copy } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
@@ -114,8 +114,8 @@ export default function ScheduleDispatchPage() {
     const fetchDictionaries = async () => {
         try {
             const [projRes, staffRes] = await Promise.all([
-                fetch(`${API_URL}/api/projects?limit=1000`),
-                fetch(`${API_URL}/api/staff`)
+                fetch('/api/projects?limit=1000'),
+                fetch('/api/staff')
             ]);
             if (projRes.ok) setProjects((await projRes.json()).data || []);
             if (staffRes.ok) setStaff(await staffRes.json() || []);
@@ -142,7 +142,7 @@ export default function ScheduleDispatchPage() {
         }
 
         try {
-            const res = await fetch(`${API_URL}/api/schedule?start=${start}&end=${end}`);
+            const res = await fetch(`/api/schedule?start=${start}&end=${end}`);
             if (res.ok) {
                 const data = await res.json();
                 const flatBookings = data.flatMap((e: any) => e.bookings || []);
@@ -155,7 +155,7 @@ export default function ScheduleDispatchPage() {
     const fetchProjectComponents = async (projectId: number) => {
         if (projectId > 0) {
             try {
-                const res = await fetch(`${API_URL}/api/projects/${projectId}/components`);
+                const res = await fetch(`/api/projects/${projectId}/components`);
                 if (res.ok) setProjectComponents(await res.json() || []);
             } catch (err) { }
         } else {
@@ -170,7 +170,7 @@ export default function ScheduleDispatchPage() {
 
         if (projectId > 0) {
             try {
-                const res = await fetch(`${API_URL}/api/projects/${projectId}/available-items`);
+                const res = await fetch(`/api/projects/${projectId}/available-items`);
                 if (res.ok) setReadyItems(await res.json() || []);
             } catch (err) { console.error("Failed to fetch available items", err); }
         } else {
@@ -194,7 +194,7 @@ export default function ScheduleDispatchPage() {
             if (b.project_id > 0) {
                 fetchProjectComponents(b.project_id);
                 try {
-                    const res = await fetch(`${API_URL}/api/projects/${b.project_id}/available-items`);
+                    const res = await fetch(`/api/projects/${b.project_id}/available-items`);
                     if (res.ok) setReadyItems(await res.json() || []);
                 } catch (err) {}
             } else {
@@ -203,7 +203,7 @@ export default function ScheduleDispatchPage() {
             }
 
             try {
-                const res = await fetch(`${API_URL}/api/schedule/bookings/${b.booking_id}/details`);
+                const res = await fetch(`/api/schedule/bookings/${b.booking_id}/details`);
                 if (res.ok) {
                     const details = await res.json();
                     setItems(details.items || []);
@@ -241,7 +241,7 @@ export default function ScheduleDispatchPage() {
         try {
             const payload = { ...form, items, crew };
             const method = form.booking_id > 0 ? 'PUT' : 'POST';
-            const url = form.booking_id > 0 ? `${API_URL}/api/schedule/bookings/${form.booking_id}` : `${API_URL}/api/schedule/bookings`;
+            const url = form.booking_id > 0 ? `/api/schedule/bookings/${form.booking_id}` : '/api/schedule/bookings';
 
             const res = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
@@ -257,13 +257,13 @@ export default function ScheduleDispatchPage() {
 
         try {
             const payload = { ...form, items, crew };
-            const saveRes = await fetch(`${API_URL}/api/schedule/bookings/${form.booking_id}`, { 
+            const saveRes = await fetch(`/api/schedule/bookings/${form.booking_id}`, { 
                 method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) 
             });
 
             if (!saveRes.ok) return alert("Failed to save the FSM payload. Cannot push to warehouse.");
 
-            const res = await fetch(`${API_URL}/api/delivery/generate-from-booking/${form.booking_id}`, { method: 'POST' });
+            const res = await fetch(`/api/delivery/generate-from-booking/${form.booking_id}`, { method: 'POST' });
 
             if (res.ok) {
                 alert("Success! Job Order saved and Delivery Receipt generated.");
@@ -426,7 +426,7 @@ export default function ScheduleDispatchPage() {
         setBookings(prev => prev.map(b => String(b.booking_id) === String(bookingId) ? { ...b, start_time: newStartFmt, end_time: newEndFmt } : b));
 
         try {
-            await fetch(`${API_URL}/api/schedule/bookings/${bookingId}/move`, {
+            await fetch(`/api/schedule/bookings/${bookingId}/move`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     start_date: extractSafeDate(booking.start_date), end_date: extractSafeDate(booking.end_date), 
@@ -462,7 +462,7 @@ export default function ScheduleDispatchPage() {
         setBookings(prev => prev.map(b => String(b.booking_id) === String(bookingId) ? { ...b, start_date: newStartFmt, end_date: newEndFmt } : b));
 
         try {
-            await fetch(`${API_URL}/api/schedule/bookings/${bookingId}/move`, {
+            await fetch(`/api/schedule/bookings/${bookingId}/move`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     start_date: newStartFmt, end_date: newEndFmt, 

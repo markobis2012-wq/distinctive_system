@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select...", disabled = false }: any) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -92,12 +92,12 @@ export default function PurchasingPage() {
     const fetchData = async () => {
         try {
             const [itemsRes, compRes, awardedRes, invRes, incomingRes, rfqRes] = await Promise.all([
-                fetch(`${API_URL}/api/canvass/items`), 
-                fetch(`${API_URL}/api/companies`),
-                fetch(`${API_URL}/api/po/awarded-items`),
-                fetch(`${API_URL}/api/inventory`),
-                fetch(`${API_URL}/api/po/incoming`),
-                fetch(`${API_URL}/api/rfqs`)
+                fetch('/api/canvass/items'), 
+                fetch('/api/companies'),
+                fetch('/api/po/awarded-items'),
+                fetch('/api/inventory'),
+                fetch('/api/po/incoming'),
+                fetch('/api/rfqs')
             ]);
             if (itemsRes.ok) setItems(await itemsRes.json() || []);
             if (compRes.ok) setCompanies(await compRes.json() || []);
@@ -114,7 +114,7 @@ export default function PurchasingPage() {
         if (prospectForm.supplier_id > 0) {
             setIsCatalogLoading(true);
             try {
-                const res = await fetch(`${API_URL}/api/companies/${prospectForm.supplier_id}/products`);
+                const res = await fetch(`/api/companies/${prospectForm.supplier_id}/products`);
                 if (res.ok) setSupplierCatalog(await res.json() || []);
             } catch (err) { console.error(err); }
             setIsCatalogLoading(false);
@@ -149,7 +149,7 @@ export default function PurchasingPage() {
         const selectedComponentsData = items.filter(i => selectedMRFItemIds.includes(i.mrf_item_id));
 
         try {
-            const res = await fetch(`${API_URL}/api/canvass/quotes/bulk`, {
+            const res = await fetch('/api/canvass/quotes/bulk', {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ supplier_id: bulkForm.supplier_id, rfq_number: rfqNum, mrf_item_ids: selectedMRFItemIds })
@@ -179,7 +179,7 @@ export default function PurchasingPage() {
 
     const handleReprintRFQ = async (rfqNum: string, supplierName: string) => {
         try {
-            const res = await fetch(`${API_URL}/api/rfqs/${rfqNum}/items`);
+            const res = await fetch(`/api/rfqs/${rfqNum}/items`);
             if (res.ok) {
                 const fetchedItems = await res.json();
                 printConsolidatedRFQ(supplierName, rfqNum, fetchedItems);
@@ -193,7 +193,7 @@ export default function PurchasingPage() {
         setIsCanvasModalOpen(true);
         setProspectForm({ supplier_id: 0, supplier_product_id: 0, rfq_number: '' });
         try {
-            const res = await fetch(`${API_URL}/api/canvass/item/${item.mrf_item_id}/quotes`);
+            const res = await fetch(`/api/canvass/item/${item.mrf_item_id}/quotes`);
             if (res.ok) setQuotes(await res.json() || []);
         } catch (err) { console.error(err); }
     };
@@ -206,13 +206,13 @@ export default function PurchasingPage() {
         const rfqNumToSubmit = prospectForm.rfq_number.trim();
 
         try {
-            const res = await fetch(`${API_URL}/api/canvass/quotes`, {
+            const res = await fetch('/api/canvass/quotes', {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ mrf_item_id: selectedItem.mrf_item_id, supplier_id: prospectForm.supplier_id, supplier_product_id: prospectForm.supplier_product_id, rfq_number: rfqNumToSubmit, quoted_unit_price: 0, quoted_landed_price: 0, quoted_selling_price: 0, remarks: '' })
             });
             if (res.ok) {
-                const refreshRes = await fetch(`${API_URL}/api/canvass/item/${selectedItem.mrf_item_id}/quotes`);
+                const refreshRes = await fetch(`/api/canvass/item/${selectedItem.mrf_item_id}/quotes`);
                 if (refreshRes.ok) setQuotes(await refreshRes.json() || []);
                 setProspectForm({ supplier_id: 0, supplier_product_id: 0, rfq_number: '' });
             }
@@ -225,14 +225,14 @@ export default function PurchasingPage() {
         setIsRFQManageModalOpen(true);
         setEditingQuoteId(null);
         try {
-            const res = await fetch(`${API_URL}/api/rfqs/${rfq.rfq_number}/quotes`);
+            const res = await fetch(`/api/rfqs/${rfq.rfq_number}/quotes`);
             if (res.ok) setRfqLineItems(await res.json() || []);
         } catch (err) { console.error(err); }
     };
 
     const handleSavePrices = async (canvassId: number, refreshSource: 'rfq' | 'canvass') => {
         try {
-            const res = await fetch(`${API_URL}/api/canvass/quotes/${canvassId}`, {
+            const res = await fetch(`/api/canvass/quotes/${canvassId}`, {
                 method: 'PUT', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ quoted_unit_price: parseFloat(priceForm.quoted_unit_price) || 0, quoted_landed_price: parseFloat(priceForm.quoted_landed_price) || 0, quoted_selling_price: parseFloat(priceForm.quoted_selling_price) || 0, remarks: priceForm.remarks })
@@ -240,7 +240,7 @@ export default function PurchasingPage() {
             if (res.ok) {
                 setEditingQuoteId(null);
                 if (refreshSource === 'rfq') {
-                    const refreshRes = await fetch(`${API_URL}/api/rfqs/${selectedRFQ.rfq_number}/quotes`);
+                    const refreshRes = await fetch(`/api/rfqs/${selectedRFQ.rfq_number}/quotes`);
                     if (refreshRes.ok) setRfqLineItems(await refreshRes.json() || []);
                 }
                 fetchData();
@@ -252,7 +252,7 @@ export default function PurchasingPage() {
     const handleAwardSupplier = async (canvassId: number, mrfItemId: number, refreshSource: 'rfq' | 'canvass') => {
         if (!confirm("Award this supplier? This will lock the price and push the item to the PO queue.")) return;
         try {
-            const res = await fetch(`${API_URL}/api/canvass/award`, {
+            const res = await fetch('/api/canvass/award', {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ canvass_id: canvassId, mrf_item_id: mrfItemId })
@@ -260,7 +260,7 @@ export default function PurchasingPage() {
             if (res.ok) {
                 alert("Supplier awarded successfully!");
                 if (refreshSource === 'rfq') {
-                    const refreshRes = await fetch(`${API_URL}/api/rfqs/${selectedRFQ.rfq_number}/quotes`);
+                    const refreshRes = await fetch(`/api/rfqs/${selectedRFQ.rfq_number}/quotes`);
                     if (refreshRes.ok) setRfqLineItems(await refreshRes.json() || []);
                 } else if (refreshSource === 'canvass') {
                     setIsCanvasModalOpen(false); // Close item view after awarding
@@ -293,7 +293,7 @@ export default function PurchasingPage() {
         const finalPONum = poNum.trim() || `PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
         try {
-            const res = await fetch(`${API_URL}/api/po/generate`, {
+            const res = await fetch('/api/po/generate', {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ po_number: finalPONum, project_id: projectId, supplier_id: supplierId, mrf_item_ids: selectedPOMRFItemIds })
@@ -309,7 +309,7 @@ export default function PurchasingPage() {
     const handleCancelAward = async (mrfItemId: number) => {
         if (!confirm("Are you sure you want to cancel this award? The item will be returned to the Canvassing Board.")) return;
         try {
-            const res = await fetch(`${API_URL}/api/canvass/cancel-award`, {
+            const res = await fetch('/api/canvass/cancel-award', {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ mrf_item_id: mrfItemId })
@@ -348,7 +348,7 @@ export default function PurchasingPage() {
     const handleUpdateETA = async (poNumber: string, etaDate: string) => {
         setIncomingPOs(prev => prev.map(p => p.po_number === poNumber ? {...p, expected_delivery: etaDate} : p));
         try {
-            await fetch(`${API_URL}/api/po/${poNumber}/eta`, { 
+            await fetch(`/api/po/${poNumber}/eta`, { 
                 method: 'PUT', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ eta: etaDate }) 
@@ -362,7 +362,7 @@ export default function PurchasingPage() {
         if (isNaN(qty) || qty <= 0) return alert("Please enter a valid quantity.");
         
         try {
-            const res = await fetch(`${API_URL}/api/po/receive`, {
+            const res = await fetch('/api/po/receive', {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ po_item_id: itemToReceive.po_item_id, qty_received: qty })

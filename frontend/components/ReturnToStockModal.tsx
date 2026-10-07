@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ArchiveRestore, X, AlertCircle } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface RTSModalProps {
     isOpen: boolean;
@@ -23,7 +23,7 @@ export default function ReturnToStockModal({ isOpen, onClose, projectId = 0 }: R
 
     useEffect(() => {
         if (isOpen) {
-            fetch(`${API_URL}/api/inventory`)
+            fetch('/api/inventory')
                 .then(res => res.json())
                 .then(data => setInventoryList(Array.isArray(data) ? data : []));
         } else {
@@ -39,7 +39,7 @@ export default function ReturnToStockModal({ isOpen, onClose, projectId = 0 }: R
         if (form.return_qty <= 0) return alert("Quantity must be greater than zero.");
 
         try {
-            const res = await fetch(`${API_URL}/api/inventory/return`, {
+            const res = await fetch('/api/inventory/return', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, X, User as UserIcon, Mail, Phone, Building2, UploadCloud } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function SiteStaffPage() {
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -29,14 +29,14 @@ export default function SiteStaffPage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/staff`);
+      const res = await fetch('/api/staff');
       if (res.ok) setStaffList(await res.json() || []);
     } catch (err) { console.error(err); }
   };
 
   const fetchDepartments = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/departments`);
+      const res = await fetch('/api/departments');
       if (res.ok) setDepartments(await res.json() || []);
     } catch (err) { console.error(err); }
   };
@@ -80,7 +80,7 @@ export default function SiteStaffPage() {
       uploadData.append('avatar', selectedFile);
 
       try {
-        const uploadRes = await fetch(`${API_URL}/api/staff/upload-avatar`, {
+        const uploadRes = await fetch('/api/staff/upload-avatar', {
           method: 'POST',
           body: uploadData, // Note: fetch automatically sets the correct multipart/form-data headers
         });
@@ -98,7 +98,7 @@ export default function SiteStaffPage() {
 
     // 2. Save the staff profile with the final Avatar URL
     const method = editingId ? 'PUT' : 'POST';
-    const url = editingId ? `${API_URL}/api/staff/${editingId}` : `${API_URL}/api/staff`;
+    const url = editingId ? `/api/staff/${editingId}` : '/api/staff';
 
     await fetch(url, {
       method,
@@ -112,7 +112,7 @@ export default function SiteStaffPage() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this staff member? They will be removed from future schedules.")) return;
-    await fetch(`${API_URL}/api/staff/${id}`, { method: 'DELETE' });
+    await fetch(`/api/staff/${id}`, { method: 'DELETE' });
     fetchData();
   };
 
@@ -126,7 +126,7 @@ export default function SiteStaffPage() {
   const getAvatarSrc = (url: string) => {
     if (!url) return '';
     if (url.startsWith('http')) return url; // External URL (like dummy pravatar links)
-    return `${API_URL}${url}`;              // Local Server File
+    return `${url}`;              // Local Server File
   };
 
   return (

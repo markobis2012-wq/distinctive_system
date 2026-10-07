@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save, X, Plus, Search, ChevronDown, Package, ImageIcon, Building2, Truck, Activity, Trash2, Filter, AlertTriangle, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // --- CUSTOM SEARCHABLE DROPDOWN COMPONENT ---
 interface SearchableDropdownProps {
@@ -117,35 +117,35 @@ export default function InventoryPage() {
 
     const fetchInventory = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/inventory`);
+            const res = await fetch('/api/inventory');
             if (res.ok) setInventory(await res.json());
         } catch (err) {} finally { setLoading(false); }
     };
 
     const fetchPendingMRFs = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/warehouse/mrfs/pending`);
+            const res = await fetch('/api/warehouse/mrfs/pending');
             if (res.ok) setPendingMRFs(await res.json());
         } catch (err) {}
     };
 
     const fetchAttributes = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/attributes`);
+            const res = await fetch('/api/attributes');
             if (res.ok) setGlobalAttributes(await res.json());
         } catch (err) {}
     };
 
     const fetchClassifications = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/classifications`);
+            const res = await fetch('/api/classifications');
             if (res.ok) setGlobalClassifications(await res.json());
         } catch (err) {}
     };
 
     const fetchUOMs = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/uoms`);
+            const res = await fetch('/api/uoms');
             if (res.ok) setGlobalUOMs(await res.json());
         } catch (err) {}
     };
@@ -211,7 +211,7 @@ export default function InventoryPage() {
         }
 
         try {
-            const res = await fetch(`${API_URL}/api/inventory`, { method: 'POST', body: formData });
+            const res = await fetch('/api/inventory', { method: 'POST', body: formData });
             if (res.ok) {
                 setIsCreateModalOpen(false);
                 setCreateForm({ dbos_code: '', inventory_name: '', description: '', uom_id: '' });
@@ -222,7 +222,7 @@ export default function InventoryPage() {
                 fetchInventory();
 
                 if (selectedMRF) {
-                    const latestInv = await (await fetch(`${API_URL}/api/inventory`)).json();
+                    const latestInv = await (await fetch('/api/inventory')).json();
                     setInventory(latestInv);
                 }
             } else { 
@@ -236,7 +236,7 @@ export default function InventoryPage() {
     const handleQuickCreateAttribute = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/api/attributes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAttributeForm) });
+            const res = await fetch('/api/attributes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAttributeForm) });
             if (res.ok) {
                 const newAttr = await res.json();
                 setGlobalAttributes([...globalAttributes, newAttr]);
@@ -249,7 +249,7 @@ export default function InventoryPage() {
     const handleQuickCreateClassification = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/api/classifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClassForm) });
+            const res = await fetch('/api/classifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClassForm) });
             if (res.ok) {
                 const newClass = await res.json();
                 setGlobalClassifications([...globalClassifications, newClass]);
@@ -263,7 +263,7 @@ export default function InventoryPage() {
         setSelectedMRF(mrf);
         setIssueDestination('Production Floor');
         try {
-            const res = await fetch(`${API_URL}/api/warehouse/mrfs/${mrf.mrf_id}/items`);
+            const res = await fetch(`/api/warehouse/mrfs/${mrf.mrf_id}/items`);
             if (res.ok) {
                 const data = await res.json();
                 const initializedItems = data.map((item: any) => ({
@@ -283,7 +283,7 @@ export default function InventoryPage() {
         }
 
         try {
-            const res = await fetch(`${API_URL}/api/warehouse/mrfs/fulfill`, {
+            const res = await fetch('/api/warehouse/mrfs/fulfill', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -452,7 +452,7 @@ export default function InventoryPage() {
                                     >
                                         <td className="px-6 py-4">
                                             {item.image_path ? (
-                                                <img src={`${API_URL}${item.image_path}`} alt="Item" className="h-12 w-12 object-cover rounded border border-slate-200" />
+                                                <img src={`${item.image_path}`} alt="Item" className="h-12 w-12 object-cover rounded border border-slate-200" />
                                             ) : (
                                                 <div className="h-12 w-12 bg-slate-100 rounded border border-slate-200 flex items-center justify-center"><ImageIcon className="h-5 w-5 text-slate-300" /></div>
                                             )}
@@ -955,7 +955,7 @@ export function InventoryItemDetail() {
     const fetchAllData = async () => {
         try {
             setLoading(true);
-            const invRes = await fetch(`${API_URL}/api/inventory`);
+            const invRes = await fetch('/api/inventory');
             if (!invRes.ok) throw new Error("Failed to fetch inventory");
             const allItems = await invRes.json();
             const currentItem = allItems.find((i: any) => i.inventory_id.toString() === itemId);
@@ -974,15 +974,15 @@ export function InventoryItemDetail() {
 
                 // Fetch secondary data concurrently
                 const [attrRes, classRes, histRes, supRes, mrfRes, compRes, catRes, txTypesRes, uomRes] = await Promise.all([
-                    fetch(`${API_URL}/api/attributes`),
-                    fetch(`${API_URL}/api/classifications`),
-                    fetch(`${API_URL}/api/inventory/${itemId}/ledger`),
-                    fetch(`${API_URL}/api/inventory/${itemId}/suppliers`),
-                    fetch(`${API_URL}/api/inventory/${itemId}/mrfs`),
-                    fetch(`${API_URL}/api/companies`),
-                    fetch(`${API_URL}/api/inventory/catalog/${encodeURIComponent(currentItem.dbos_code)}`),
-                    fetch(`${API_URL}/api/transactions/types`),
-                    fetch(`${API_URL}/api/uoms`)
+                    fetch('/api/attributes'),
+                    fetch('/api/classifications'),
+                    fetch(`/api/inventory/${itemId}/ledger`),
+                    fetch(`/api/inventory/${itemId}/suppliers`),
+                    fetch(`/api/inventory/${itemId}/mrfs`),
+                    fetch('/api/companies'),
+                    fetch(`/api/inventory/catalog/${encodeURIComponent(currentItem.dbos_code)}`),
+                    fetch('/api/transactions/types'),
+                    fetch('/api/uoms')
                 ]);
 
                 if (attrRes.ok) setGlobalAttributes(await attrRes.json());
@@ -1028,7 +1028,7 @@ export function InventoryItemDetail() {
         }
 
         try {
-            const res = await fetch(`${API_URL}/api/inventory`, { method: 'POST', body: formData });
+            const res = await fetch('/api/inventory', { method: 'POST', body: formData });
             if (res.ok) {
                 setIsCreateModalOpen(false);
                 setCreateForm({ dbos_code: '', inventory_name: '', description: '', uom_id: '' });
@@ -1061,7 +1061,7 @@ export function InventoryItemDetail() {
         if (imageFile) formData.append('image', imageFile);
 
         try {
-            const res = await fetch(`${API_URL}/api/inventory/${itemId}`, { method: 'PUT', body: formData });
+            const res = await fetch(`/api/inventory/${itemId}`, { method: 'PUT', body: formData });
             if (res.ok) {
                 alert("Inventory updated successfully!");
                 fetchAllData(); 
@@ -1104,7 +1104,7 @@ export function InventoryItemDetail() {
     const handleAddManualLedger = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/api/inventory/${itemId}/ledger/manual`, {
+            const res = await fetch(`/api/inventory/${itemId}/ledger/manual`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     transaction_type_id: parseInt(ledgerForm.type_id),
@@ -1128,7 +1128,7 @@ export function InventoryItemDetail() {
 
     const handleUpdateHistoryRecord = async (ledgerID: number) => {
         try {
-            const res = await fetch(`${API_URL}/api/inventory/history/${ledgerID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(historyEditForm) });
+            const res = await fetch(`/api/inventory/history/${ledgerID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(historyEditForm) });
             if (res.ok) {
                 setEditingHistoryId(null);
                 fetchAllData();
@@ -1145,7 +1145,7 @@ export function InventoryItemDetail() {
         if (!confirm("Are you sure you want to delete this transaction? This will reverse the quantity change on the master inventory.")) return;
         
         try {
-            const res = await fetch(`${API_URL}/api/inventory/ledger/${ledgerId}`, { method: 'DELETE' });
+            const res = await fetch(`/api/inventory/ledger/${ledgerId}`, { method: 'DELETE' });
             if (res.ok) {
                 alert("Transaction successfully deleted and stock reversed.");
                 fetchAllData();
@@ -1160,7 +1160,7 @@ export function InventoryItemDetail() {
     const handleAddSupplier = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/api/inventory/suppliers`, {
+            const res = await fetch('/api/inventory/suppliers', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     inventory_id: parseInt(itemId as string),
@@ -1180,14 +1180,14 @@ export function InventoryItemDetail() {
     const handleRemoveSupplier = async (mappingId: number) => {
         if (!confirm("Remove this supplier mapping?")) return;
         try {
-            await fetch(`${API_URL}/api/inventory/suppliers/${mappingId}`, { method: 'DELETE' });
+            await fetch(`/api/inventory/suppliers/${mappingId}`, { method: 'DELETE' });
             fetchAllData();
         } catch (err) {}
     };
 
     const handleSetPreferred = async (mappingId: number) => {
         try {
-            await fetch(`${API_URL}/api/inventory/${itemId}/suppliers/${mappingId}/preferred`, { method: 'PUT' });
+            await fetch(`/api/inventory/${itemId}/suppliers/${mappingId}/preferred`, { method: 'PUT' });
             fetchAllData();
         } catch (err) {}
     };
@@ -1195,7 +1195,7 @@ export function InventoryItemDetail() {
     const handleQuickCreateAttribute = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/api/attributes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAttributeForm) });
+            const res = await fetch('/api/attributes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAttributeForm) });
             if (res.ok) {
                 const newAttr = await res.json();
                 setGlobalAttributes([...globalAttributes, newAttr]);
@@ -1208,7 +1208,7 @@ export function InventoryItemDetail() {
     const handleQuickCreateClassification = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/api/classifications`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClassForm) });
+            const res = await fetch('/api/classifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClassForm) });
             if (res.ok) {
                 const newClass = await res.json();
                 setGlobalClassifications([...globalClassifications, newClass]);
@@ -1253,7 +1253,7 @@ export function InventoryItemDetail() {
                         <h2 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-4">Item Details</h2>
                         <div className="mb-6 flex justify-center">
                             {inventoryItem.image_path ? (
-                                <img src={`${API_URL}${inventoryItem.image_path}`} alt="Item" className="h-40 w-40 object-cover rounded-xl border border-slate-200 shadow-sm" />
+                                <img src={`${inventoryItem.image_path}`} alt="Item" className="h-40 w-40 object-cover rounded-xl border border-slate-200 shadow-sm" />
                             ) : (
                                 <div className="h-40 w-40 bg-slate-50 rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400">
                                     <ImageIcon className="h-8 w-8 mb-2 opacity-50" />

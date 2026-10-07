@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ArrowUpDown, Building2, ChevronDown, ChevronUp, Phone, UserCircle, Plus, Trash2, X, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081';
+//const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081';
 
 interface Contact {
   type: string;
@@ -68,7 +68,7 @@ export default function DirectoryPage() {
   const fetchCompanies = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/api/companies`);
+      const res = await fetch('/api/companies');
       const data = await res.json();
       
       if (Array.isArray(data)) {
@@ -92,7 +92,7 @@ export default function DirectoryPage() {
   const handleAddCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_URL}/api/companies`, {
+      const res = await fetch('/api/companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -121,7 +121,7 @@ export default function DirectoryPage() {
     if (!confirm("Are you sure you want to delete this company? This action cannot be undone.")) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/companies/${id}`, {
+      const res = await fetch(`/api/companies/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {

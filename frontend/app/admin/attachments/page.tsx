@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, X, FileText, UploadCloud, Calendar, Download, AlertCircle } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+//const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function GeneralAttachmentsPage() {
   const [attachments, setAttachments] = useState<any[]>([]);
@@ -32,7 +32,7 @@ export default function GeneralAttachmentsPage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/attachments`);
+      const res = await fetch('/api/attachments');
       if (res.ok) setAttachments(await res.json() || []);
     } catch (err) { console.error(err); }
   };
@@ -40,7 +40,7 @@ export default function GeneralAttachmentsPage() {
   const fetchTypes = async () => {
     try {
       // Reusing your existing endpoint for attachment types!
-      const res = await fetch(`${API_URL}/api/attachment-types`);
+      const res = await fetch('/api/attachment-types');
       if (res.ok) setAttachmentTypes(await res.json() || []);
     } catch (err) { console.error(err); }
   };
@@ -90,7 +90,7 @@ export default function GeneralAttachmentsPage() {
       uploadData.append('document', selectedFile);
 
       try {
-        const uploadRes = await fetch(`${API_URL}/api/attachments/upload`, {
+        const uploadRes = await fetch('/api/attachments/upload', {
           method: 'POST',
           body: uploadData,
         });
@@ -116,7 +116,7 @@ export default function GeneralAttachmentsPage() {
 
     // 2. Save Data
     const method = editingId ? 'PUT' : 'POST';
-    const url = editingId ? `${API_URL}/api/attachments/${editingId}` : `${API_URL}/api/attachments`;
+    const url = editingId ? `/api/attachments/${editingId}` : '/api/attachments';
 
     await fetch(url, {
       method,
@@ -130,7 +130,7 @@ export default function GeneralAttachmentsPage() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this attachment permanently?")) return;
-    await fetch(`${API_URL}/api/attachments/${id}`, { method: 'DELETE' });
+    await fetch(`/api/attachments/${id}`, { method: 'DELETE' });
     fetchData();
   };
 
@@ -219,7 +219,7 @@ export default function GeneralAttachmentsPage() {
                     </td>
                     <td className="p-4 text-right">
                       {att.file_path && (
-                        <a href={`${API_URL}${att.file_path}`} target="_blank" rel="noopener noreferrer" title="Download File" className="inline-block p-2 text-slate-400 hover:text-indigo-600 transition-colors">
+                        <a href={`${att.file_path}`} target="_blank" rel="noopener noreferrer" title="Download File" className="inline-block p-2 text-slate-400 hover:text-indigo-600 transition-colors">
                           <Download className="h-5 w-5" />
                         </a>
                       )}

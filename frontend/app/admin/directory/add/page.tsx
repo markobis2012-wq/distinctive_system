@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Building2, ArrowLeft, Save, Check, X } from 'lucide-react';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
+// const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
 
 interface LocationData {
   islands: { id: number; name: string }[];
@@ -34,7 +34,7 @@ export default function AddCompanyPage() {
   useEffect(() => {
     const fetchLocations = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/locations`);
+        const res = await fetch('/api/locations');
         if (res.ok) setLocations(await res.json());
       } catch (err) { console.error(err); }
     };
@@ -63,7 +63,7 @@ export default function AddCompanyPage() {
 
     try {
       if (type === 'region') {
-        const res = await fetch(`${API_URL}/api/locations/region`, {
+        const res = await fetch('/api/locations/region', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: newLocName, island_group_id: formData.island_group_id })
         });
@@ -74,7 +74,7 @@ export default function AddCompanyPage() {
       }
       
       if (type === 'province') {
-        const res = await fetch(`${API_URL}/api/locations/province`, {
+        const res = await fetch('/api/locations/province', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: newLocName, region_id: formData.region_id })
         });
@@ -85,7 +85,7 @@ export default function AddCompanyPage() {
       }
       
       if (type === 'city') {
-        const res = await fetch(`${API_URL}/api/locations/city`, {
+        const res = await fetch('/api/locations/city', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: newLocName, province_id: formData.province_id, region_id: formData.region_id })
         });
@@ -106,7 +106,7 @@ export default function AddCompanyPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/companies`, {
+      const res = await fetch('/api/companies', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });

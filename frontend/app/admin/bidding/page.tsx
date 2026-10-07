@@ -6,7 +6,7 @@ import { Search, Plus, Trash2, Edit2, Check, X, FileSignature, Filter, ArrowUp, 
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
+//const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
 
 // --- Custom Searchable Select Dropdown ---
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select...", onAddNew }: any) => {
@@ -117,7 +117,7 @@ export default function BiddingPage() {
 
   const fetchDictionaries = async () => {
     try {
-      const [compRes, locRes] = await Promise.all([ fetch(`${API_URL}/api/companies`), fetch(`${API_URL}/api/locations`) ]);
+      const [compRes, locRes] = await Promise.all([ fetch('/api/companies'), fetch('/api/locations') ]);
       if (compRes.ok) setCompanies(await compRes.json());
       if (locRes.ok) setLocations(await locRes.json());
     } catch (err) {}
@@ -150,7 +150,7 @@ export default function BiddingPage() {
         company: String(filters.company), island: String(filters.island), region: String(filters.region), province: String(filters.province), city: String(filters.city),
         preBidStart: filters.preBidStart, preBidEnd: filters.preBidEnd, bidStart: filters.bidStart, bidEnd: filters.bidEnd
       });
-      const res = await fetch(`${API_URL}/api/biddings?${queryParams.toString()}`);
+      const res = await fetch(`/api/biddings?${queryParams.toString()}`);
       if (res.ok) {
         const json = await res.json();
         setBiddings(json.data);
@@ -226,9 +226,9 @@ export default function BiddingPage() {
       if (!payload.approved_budget) payload.approved_budget = 0;
       if (!payload.client_id) payload.client_id = 0;
 
-      const baseUrl = API_URL || ''; 
+      //const baseUrl = API_URL || ''; 
 
-      const res = await fetch(`${baseUrl}/api/biddings`, {
+      const res = await fetch('/api/biddings', {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(payload)
@@ -270,7 +270,7 @@ export default function BiddingPage() {
     const target = biddings.find(b => b.bidding_id === id);
     if (!target) return;
     try {
-      const res = await fetch(`${API_URL}/api/biddings/${id}`, {
+      const res = await fetch(`/api/biddings/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...target, [field]: value })
       });
       if (res.ok) fetchBiddings();
@@ -280,7 +280,7 @@ export default function BiddingPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this bidding record?")) return;
     try {
-      const res = await fetch(`${API_URL}/api/biddings/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/biddings/${id}`, { method: 'DELETE' });
       if (res.ok) fetchBiddings();
     } catch (err) {}
   };
@@ -308,7 +308,7 @@ export default function BiddingPage() {
     }
 
     try {
-      const res = await fetch(`${API_URL}${endpoint}`, {
+      const res = await fetch(`${endpoint}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });

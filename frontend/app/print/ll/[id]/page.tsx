@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function PrintLoadingListPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -23,11 +23,11 @@ export default function PrintLoadingListPage({ params }: { params: Promise<{ id:
 
     const fetchData = async () => {
       try {
-        const drRes = await fetch(`${API_URL}/api/deliveries/${deliveryId}`);
+        const drRes = await fetch(`/api/deliveries/${deliveryId}`);
         if (drRes.ok) setDelivery(await drRes.json());
         
         // UPDATED: Now fetches from the Unified Shipment Items endpoint!
-        const itemsRes = await fetch(`${API_URL}/api/deliveries/${deliveryId}/items`);
+        const itemsRes = await fetch(`/api/deliveries/${deliveryId}/items`);
         if (itemsRes.ok) setItems(await itemsRes.json());
       } catch (err) { console.error(err); } finally { setLoading(false); }
     };
@@ -107,12 +107,12 @@ export default function PrintLoadingListPage({ params }: { params: Promise<{ id:
                 </div>
                 
                 <div style={{ width: '140px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center' }}>
-                  {item.dbos_image_path && <img src={`${API_URL}${item.dbos_image_path}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
+                  {item.dbos_image_path && <img src={`${item.dbos_image_path}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
                 </div>
                 <div style={{ width: '150px', padding: '5px', borderRight: '1px solid #888' }}>{item.product_name}<br/><span style={{ fontSize:'10px' }}>{item.product_description}</span></div>
                 <div style={{ width: '240px', padding: '5px', borderRight: '1px solid #888' }}><b>{item.supplier_product_name || item.item_name}</b><br/>{item.prod_description}</div>
                 <div style={{ width: '140px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center' }}>
-                  {item.product_image && <img src={`${API_URL}/uploads/suppliers_product_images/${item.product_image}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
+                  {item.product_image && <img src={`/uploads/suppliers_product_images/${item.product_image}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
                 </div>
                 <div style={{ width: '100px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center', fontWeight: 'bold' }}>{item.item_qty || item.qty}</div>
                 <div style={{ flex: 1, padding: '5px' }}>{item.remarks}</div>

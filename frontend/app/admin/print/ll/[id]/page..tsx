@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Package } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const getImageUrl = (path: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    return `${API_URL}/${path.replace('./', '')}`;
+    return `/${path.replace('./', '')}`;
 };
 
 export default function PrintLoadingList() {
@@ -27,12 +27,12 @@ export default function PrintLoadingList() {
         if (!deliveryId) return;
 
         // Fetch the Delivery Record
-        fetch(`${API_URL}/api/deliveries/${deliveryId}`)
+        fetch(`/api/deliveries/${deliveryId}`)
             .then(res => res.json())
             .then(data => setDeliveryInfo(data));
 
         // Fetch the Raw Components (The standard items endpoint)
-        fetch(`${API_URL}/api/deliveries/${deliveryId}/items`)
+        fetch(`/api/deliveries/${deliveryId}/items`)
             .then(res => res.json())
             .then(data => setItems(Array.isArray(data) ? data : []));
     }, [deliveryId]);

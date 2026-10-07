@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Hammer, CheckCircle2, Factory, PackageCheck, AlertCircle, Save, X, ChevronDown, ChevronRight, Search, Filter, Layers, ArchiveRestore, Database, PlayCircle } from 'lucide-react';
 import ReturnToStockModal from '@/components/ReturnToStockModal';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function ProductionBoardPage() {
     const [items, setItems] = useState<any[]>([]);
@@ -42,14 +42,14 @@ export default function ProductionBoardPage() {
     const fetchPipeline = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/api/production/pipeline`);
+            const res = await fetch('/api/production/pipeline');
             if (res.ok) setItems(await res.json() || []);
         } catch (err) { console.error(err); } finally { setLoading(false); }
     };
 
     const fetchInventory = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/inventory`);
+            const res = await fetch('/api/inventory');
             if (res.ok) setInventoryList(await res.json());
         } catch (err) { console.error(err); }
     };
@@ -79,7 +79,7 @@ export default function ProductionBoardPage() {
         }
 
         try {
-            const res = await fetch(`${API_URL}/api/production/items/${selectedItem.project_items_id}/start`, {
+            const res = await fetch(`/api/production/items/${selectedItem.project_items_id}/start`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ qty_to_start: parseFloat(qtyToStart.toString()) })
@@ -107,7 +107,7 @@ export default function ProductionBoardPage() {
             };
             if (insertToLedger) payload.inventory_id = parseInt(selectedInventoryId);
 
-            const res = await fetch(`${API_URL}/api/production/items/${selectedItem.project_items_id}/advance`, {
+            const res = await fetch(`/api/production/items/${selectedItem.project_items_id}/advance`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
             });
 

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'; // <-- ADDED ROUTER
 import { Search, Plus, Trash2, Edit2, Check, X, FolderKanban, Filter, ArrowUp, ArrowDown } from 'lucide-react';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
+// const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
 
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select...", onAddNew }: any) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -72,10 +72,10 @@ export default function ProjectsPage() {
     const fetchDictionaries = async () => {
       try {
         const [compRes, bidRes, deptRes, catRes] = await Promise.all([
-          fetch(`${API_URL}/api/companies`),
-          fetch(`${API_URL}/api/biddings?limit=1000`), // Get all biddings for the dropdown
-          fetch(`${API_URL}/api/departments`),
-          fetch(`${API_URL}/api/project-categories`)
+          fetch('/api/companies'),
+          fetch('/api/biddings?limit=1000'), // Get all biddings for the dropdown
+          fetch('/api/departments'),
+          fetch('/api/project-categories')
         ]);
         if (compRes.ok) setCompanies(await compRes.json());
         if (bidRes.ok) setBiddings((await bidRes.json()).data);
@@ -92,7 +92,7 @@ export default function ProjectsPage() {
         page: String(page), limit: String(limit), search: searchQuery, sortField: sortConfig.field, sortOrder: sortConfig.order,
         client_id: String(filters.client_id), department_id: String(filters.department_id), status: filters.status, category: filters.category
       });
-      const res = await fetch(`${API_URL}/api/projects?${query.toString()}`);
+      const res = await fetch(`/api/projects?${query.toString()}`);
       if (res.ok) {
         const json = await res.json();
         setProjects(json.data);
@@ -125,7 +125,7 @@ export default function ProjectsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingId ? `${API_URL}/api/projects/${editingId}` : `${API_URL}/api/projects`;
+      const url = editingId ? `/api/projects/${editingId}` : '/api/projects';
       const method = editingId ? 'PUT' : 'POST';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       if (res.ok) { setIsModalOpen(false); fetchProjects(); }
@@ -135,7 +135,7 @@ export default function ProjectsPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this project?")) return;
     try {
-      const res = await fetch(`${API_URL}/api/projects/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
       if (res.ok) fetchProjects();
     } catch (err) {}
   };

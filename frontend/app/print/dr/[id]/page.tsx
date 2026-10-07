@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function PrintDRPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -26,11 +26,11 @@ export default function PrintDRPage({ params }: { params: Promise<{ id: string }
 
     const fetchData = async () => {
       try {
-        const drRes = await fetch(`${API_URL}/api/deliveries/${deliveryId}`);
+        const drRes = await fetch(`/api/deliveries/${deliveryId}`);
         if (drRes.ok) setDelivery(await drRes.json());
 
         // UPDATED: Now fetches the PHASE 3 Roll-Up Report!
-        const itemsRes = await fetch(`${API_URL}/api/deliveries/${deliveryId}/client-report`);
+        const itemsRes = await fetch(`/api/deliveries/${deliveryId}/client-report`);
         if (itemsRes.ok) setItems(await itemsRes.json());
       } catch (err) {
         console.error(err);
@@ -138,7 +138,7 @@ export default function PrintDRPage({ params }: { params: Promise<{ id: string }
                 
                 <div style={{ width: '210px', padding: '5px' }}>
                   {item.image_path && (
-                    <img src={`${API_URL}${item.image_path}`} style={{ width: '180px', objectFit: 'contain' }} alt="" />
+                    <img src={`${item.image_path}`} style={{ width: '180px', objectFit: 'contain' }} alt="" />
                   )}
                 </div>
                 <div style={{ width: '80px', padding: '5px', fontWeight: 'bold' }}>1 {item.uom_abbr || 'Lot'}</div>

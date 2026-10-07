@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { Truck, Plus, Trash2, List, FileText, X, Search, Filter, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Edit2, Package, ArrowRightCircle, Printer, FileDown, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+//const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const getImageUrl = (path: string) => {
     if (!path) return 'https://via.placeholder.com/150?text=No+Image';
     if (path.startsWith('http')) return path;
-    return `${API_URL}/${path.replace('./', '')}`;
+    return `/${path.replace('./', '')}`;
 };
 
 export default function DeliveryPage() {
@@ -66,14 +66,14 @@ export default function DeliveryPage() {
 
     const fetchDeliveries = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/deliveries`);
+            const res = await fetch('/api/deliveries');
             if (res.ok) setDeliveries(await res.json() || []);
         } catch (err) { console.error(err); }
     };
 
     useEffect(() => {
         fetchDeliveries();
-        fetch(`${API_URL}/api/projects`).then(r => r.json()).then(data => {
+        fetch('/api/projects').then(r => r.json()).then(data => {
             if (Array.isArray(data)) setProjects(data);
             else if (data && Array.isArray(data.data)) setProjects(data.data);
             else setProjects([]);
@@ -87,7 +87,7 @@ export default function DeliveryPage() {
         const selectedProj = projects.find(p => p.projects_id === form.project_id);
         if (!selectedProj) return alert("Select a project");
 
-        await fetch(`${API_URL}/api/deliveries`, {
+        await fetch('/api/deliveries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -104,10 +104,10 @@ export default function DeliveryPage() {
 
     useEffect(() => {
         if (isManageModalOpen && selectedDelivery) {
-            fetch(`${API_URL}/api/projects/${selectedDelivery.project_id}/available-items`)
+            fetch(`/api/projects/${selectedDelivery.project_id}/available-items`)
                 .then(res => res.json()).then(data => setAvailableProjItems(Array.isArray(data) ? data : []));
 
-            fetch(`${API_URL}/api/deliveries/${selectedDelivery.delivery_id}/items`)
+            fetch(`/api/deliveries/${selectedDelivery.delivery_id}/items`)
                 .then(res => res.json()).then(data => setDeliveryItems(Array.isArray(data) ? data : []));
         } else {
             setDeliveryItems([]); setAvailableProjItems([]);
@@ -118,7 +118,7 @@ export default function DeliveryPage() {
     const handleMarkInTransit = async () => {
         if (!confirm("Are you sure you want to mark this load as IN TRANSIT? This will update the Dispatcher's calendar.")) return;
         try {
-            const res = await fetch(`${API_URL}/api/deliveries/${selectedDelivery.delivery_id}/status`, {
+            const res = await fetch(`/api/deliveries/${selectedDelivery.delivery_id}/status`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: 'In Transit' })
             });
@@ -137,7 +137,7 @@ export default function DeliveryPage() {
         if (drFile) formData.append('dr_image', drFile);
 
         try {
-            const res = await fetch(`${API_URL}/api/deliveries/${selectedDelivery.delivery_id}/complete`, {
+            const res = await fetch(`/api/deliveries/${selectedDelivery.delivery_id}/complete`, {
                 method: 'POST',
                 body: formData 
             });
@@ -163,8 +163,8 @@ export default function DeliveryPage() {
         }
 
         const url = itemForm.delivery_item_id > 0
-            ? `${API_URL}/api/deliveries/items/${itemForm.delivery_item_id}`
-            : `${API_URL}/api/deliveries/items`;
+            ? `/api/deliveries/items/${itemForm.delivery_item_id}`
+            : '/api/deliveries/items';
 
         const method = itemForm.delivery_item_id > 0 ? 'PUT' : 'POST';
         const payload = { ...itemForm, delivery_id: selectedDelivery.delivery_id };
@@ -173,9 +173,9 @@ export default function DeliveryPage() {
         if (res.ok) {
             setItemForm({ delivery_item_id: 0, project_item_component_id: 0, deliver_qty: 1, remarks: '' });
             setMaxAllowedQty(1);
-            fetch(`${API_URL}/api/deliveries/${selectedDelivery.delivery_id}/items`)
+            fetch('/api/deliveries/${selectedDelivery.delivery_id}/items')
                 .then(r => r.json()).then(d => setDeliveryItems(Array.isArray(d) ? d : []));
-            fetch(`${API_URL}/api/projects/${selectedDelivery.project_id}/available-items`)
+            fetch(`/api/projects/${selectedDelivery.project_id}/available-items`)
                 .then(r => r.json()).then(d => setAvailableProjItems(Array.isArray(d) ? d : []));
         } else {
             alert("Failed to save item");
@@ -184,16 +184,16 @@ export default function DeliveryPage() {
 
     const handleDeleteItem = async (id: number) => {
         if (!confirm("Remove this item from the shipment?")) return;
-        await fetch(`${API_URL}/api/deliveries/items/${id}`, { method: 'DELETE' });
-        fetch(`${API_URL}/api/deliveries/${selectedDelivery.delivery_id}/items`)
+        await fetch(`/api/deliveries/items/${id}`, { method: 'DELETE' });
+        fetch(`/api/deliveries/${selectedDelivery.delivery_id}/items`)
             .then(r => r.json()).then(d => setDeliveryItems(Array.isArray(d) ? d : []));
-        fetch(`${API_URL}/api/projects/${selectedDelivery.project_id}/available-items`)
+        fetch(`/api/projects/${selectedDelivery.project_id}/available-items`)
             .then(r => r.json()).then(d => setAvailableProjItems(Array.isArray(d) ? d : []));
     };
 
     const handleDeleteDelivery = async (id: number) => {
         if (!confirm("Are you sure you want to delete this entire shipment?")) return;
-        await fetch(`${API_URL}/api/deliveries/${id}`, { method: 'DELETE' });
+        await fetch(`/api/deliveries/${id}`, { method: 'DELETE' });
         fetchDeliveries();
     };
 
