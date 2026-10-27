@@ -106,14 +106,19 @@ export default function PrintLoadingListPage({ params }: { params: Promise<{ id:
                     <div style={{ width: '20px', height: '20px', border: '2px solid #555', backgroundColor: '#fff', borderRadius: '3px' }}></div>
                 </div>
                 
+                {/* FIXED: DBOS Image Path uses .startsWith('/') */}
                 <div style={{ width: '140px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center' }}>
-                  {item.dbos_image_path && <img src={`${item.dbos_image_path}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
+                  {item.dbos_image_path && <img src={item.dbos_image_path.startsWith('/') ? item.dbos_image_path : `/${item.dbos_image_path}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
                 </div>
+
                 <div style={{ width: '150px', padding: '5px', borderRight: '1px solid #888' }}>{item.product_name}<br/><span style={{ fontSize:'10px' }}>{item.product_description}</span></div>
                 <div style={{ width: '240px', padding: '5px', borderRight: '1px solid #888' }}><b>{item.supplier_product_name || item.item_name}</b><br/>{item.prod_description}</div>
+                
+                {/* FIXED: Removed hardcoded '/uploads/suppliers_product_images/' and applied startsWith('/') */}
                 <div style={{ width: '140px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center' }}>
-                  {item.product_image && <img src={`/uploads/suppliers_product_images/${item.product_image}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
+                  {item.product_image && <img src={item.product_image.startsWith('/') ? item.product_image : `/${item.product_image}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
                 </div>
+
                 <div style={{ width: '100px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center', fontWeight: 'bold' }}>{item.item_qty || item.qty}</div>
                 <div style={{ flex: 1, padding: '5px' }}>{item.remarks}</div>
               </div>

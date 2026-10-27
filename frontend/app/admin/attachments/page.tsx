@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, X, FileText, UploadCloud, Calendar, Download, AlertCircle } from 'lucide-react';
 
-//const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// Helper function to check if a file path or name is an image
+const isImageFile = (filename: string) => {
+  if (!filename) return false;
+  return /\.(jpg|jpeg|png|gif|webp)$/i.test(filename);
+};
 
 export default function GeneralAttachmentsPage() {
   const [attachments, setAttachments] = useState<any[]>([]);
@@ -14,6 +18,7 @@ export default function GeneralAttachmentsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [localPreview, setLocalPreview] = useState<string | null>(null); // NEW: State for new file previews
 
   const [formData, setFormData] = useState({
     date_uploaded: new Date().toISOString().split('T')[0],
@@ -39,7 +44,6 @@ export default function GeneralAttachmentsPage() {
 
   const fetchTypes = async () => {
     try {
-      // Reusing your existing endpoint for attachment types!
       const res = await fetch('/api/attachment-types');
       if (res.ok) setAttachmentTypes(await res.json() || []);
     } catch (err) { console.error(err); }
@@ -47,6 +51,7 @@ export default function GeneralAttachmentsPage() {
 
   const openModal = (att: any = null) => {
     setSelectedFile(null);
+    setLocalPreview(null); // Reset local preview on open
     if (att) {
       setEditingId(att.attachments_id);
       setFormData({
@@ -73,7 +78,14 @@ export default function GeneralAttachmentsPage() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      // Auto-fill the file name if it's empty!
+      
+      // NEW: Create a local preview URL if the selected file is an image
+      if (file.type.startsWith('image/')) {
+        setLocalPreview(URL.createObjectURL(file));
+      } else {
+        setLocalPreview(null);
+      }
+
       if (!formData.file_name) {
         setFormData(prev => ({ ...prev, file_name: file.name.split('.')[0] }));
       }
@@ -84,7 +96,6 @@ export default function GeneralAttachmentsPage() {
     e.preventDefault();
     let finalFilePath = formData.file_path;
 
-    // 1. Upload file if selected
     if (selectedFile) {
       const uploadData = new FormData();
       uploadData.append('document', selectedFile);
@@ -100,7 +111,7 @@ export default function GeneralAttachmentsPage() {
           finalFilePath = result.file_path; 
         } else {
           alert("Failed to upload document.");
-          return; // Stop save if upload fails
+          return; 
         }
       } catch (err) {
         console.error("Upload error:", err);
@@ -108,13 +119,11 @@ export default function GeneralAttachmentsPage() {
       }
     }
 
-    // Require a file path for new attachments
     if (!finalFilePath && !editingId) {
       alert("Please upload a file.");
       return;
     }
 
-    // 2. Save Data
     const method = editingId ? 'PUT' : 'POST';
     const url = editingId ? `/api/attachments/${editingId}` : '/api/attachments';
 
@@ -123,6 +132,9 @@ export default function GeneralAttachmentsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...formData, file_path: finalFilePath })
     });
+    
+    // Clean up local preview URL to prevent memory leaks
+    if (localPreview) URL.revokeObjectURL(localPreview);
     
     setIsModalOpen(false);
     fetchData();
@@ -187,7 +199,6 @@ export default function GeneralAttachmentsPage() {
                 const typeObj = attachmentTypes.find(t => t.id === att.attachment_file_type_id);
                 const typeName = typeObj?.type_name || typeObj?.name || 'Unknown Type';
                 
-                // Expiration logic
                 const isExpired = att.has_expiration === 1 && att.expiration_date && new Date(att.expiration_date) < new Date();
 
                 return (
@@ -219,8 +230,13 @@ export default function GeneralAttachmentsPage() {
                     </td>
                     <td className="p-4 text-right">
                       {att.file_path && (
-                        <a href={`${att.file_path}`} target="_blank" rel="noopener noreferrer" title="Download File" className="inline-block p-2 text-slate-400 hover:text-indigo-600 transition-colors">
-                          <Download className="h-5 w-5" />
+                        <a 
+                          href={att.file_path.startsWith('/') ? att.file_path : `/${att.file_path}`} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                        >
+                          <Download className="h-4 w-4" />
                         </a>
                       )}
                       <button onClick={() => openModal(att)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors ml-1"><Edit2 className="h-5 w-5" /></button>
@@ -245,24 +261,49 @@ export default function GeneralAttachmentsPage() {
             
             <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-6">
               
-              {/* FILE UPLOAD UI */}
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer relative">
-                <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
-                <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-3">
-                  <UploadCloud className="h-6 w-6 text-indigo-600" />
-                </div>
-                {selectedFile ? (
-                  <div className="text-center">
+              {/* FILE UPLOAD UI - UPDATED FOR PREVIEWS */}
+              <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer relative overflow-hidden">
+                <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                
+                {localPreview ? (
+                  // Preview for NEW selected image
+                  <div className="flex flex-col items-center text-center">
+                    <img src={localPreview} alt="New Preview" className="h-32 object-contain mb-3 rounded shadow-sm border border-slate-200" />
+                    <p className="text-sm font-bold text-slate-700">{selectedFile?.name}</p>
+                    <p className="text-xs text-slate-500 mt-1">Ready to upload</p>
+                  </div>
+                ) : selectedFile ? (
+                  // Preview for NEW selected document (non-image)
+                  <div className="flex flex-col items-center text-center">
+                    <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-3">
+                      <UploadCloud className="h-6 w-6 text-indigo-600" />
+                    </div>
                     <p className="text-sm font-bold text-slate-700">{selectedFile.name}</p>
                     <p className="text-xs text-slate-500 mt-1">Ready to upload</p>
                   </div>
                 ) : formData.file_path ? (
-                  <div className="text-center">
+                  // Preview for EXISTING file
+                  <div className="flex flex-col items-center text-center">
+                    {isImageFile(formData.file_path) ? (
+                      <img 
+                        src={formData.file_path.startsWith('/') ? formData.file_path : `/${formData.file_path}`} 
+                        alt="Current File" 
+                        className="h-32 object-contain mb-3 rounded shadow-sm border border-slate-200" 
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-3">
+                        <UploadCloud className="h-6 w-6 text-indigo-600" />
+                      </div>
+                    )}
                     <p className="text-sm font-bold text-slate-700">Current file exists</p>
-                    <p className="text-xs text-slate-500 mt-1">Click to replace file</p>
+                    <p className="text-xs text-slate-500 mt-1">Click or drag to replace</p>
                   </div>
                 ) : (
-                  <div className="text-center">
+                  // Empty state
+                  <div className="flex flex-col items-center text-center">
+                    <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-3">
+                      <UploadCloud className="h-6 w-6 text-indigo-600" />
+                    </div>
                     <p className="text-sm font-bold text-slate-700">Click to select a file</p>
                     <p className="text-xs text-slate-500 mt-1">PDF, DOCX, XLSX, JPG, PNG</p>
                   </div>
@@ -285,8 +326,14 @@ export default function GeneralAttachmentsPage() {
                   <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">File Type</label>
                   <select value={formData.attachment_file_type_id} onChange={e => setFormData({...formData, attachment_file_type_id: parseInt(e.target.value)})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 text-sm bg-white">
                     <option value="0">Select Type...</option>
-                    {/* Maps over your existing attachment types payload */}
-                    {attachmentTypes.map(t => <option key={t.id || t.type_id} value={t.id || t.type_id}>{t.type_name || t.name || t.type}</option>)}
+                    {attachmentTypes.map(t => (
+                      <option 
+                        key={t.attachment_file_type_id} 
+                        value={t.attachment_file_type_id}
+                      >
+                        {t.attachment_file_type}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>

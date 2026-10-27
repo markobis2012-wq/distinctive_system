@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, use } from 'react';
 import { Search, Plus, Trash2, Edit2, X, FileSignature, ArrowLeft, Paperclip, FileText, Download } from 'lucide-react';
 import Link from 'next/link';
 
-//const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
+// const API_URL = process.env.NEXT_PUBLIC_API_URL; // || 'http://localhost:8081';
 
 // Copy your SearchableSelect component from the previous file here...
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select...", onAddNew }: any) => {
@@ -127,7 +127,13 @@ export default function EditBiddingPage({ params }: { params: Promise<{ id: stri
   const tradeOptions = ["Implementing Rules and Regulations", "Foreign Donations"];
   const procurementOptions = ["Small Procurement", "Public Bidding", "Corporate Bidding"];
   const classificationOptions = ["Goods", "Services"];
-  const companyOptions = companies.map(c => ({ value: c.company_id, label: c.company_name }));
+  const companyOptions = (companies || [])
+    .filter(c => {
+      // Safely check the type, convert to lowercase, and remove extra spaces
+      const type = (c.company_type || "").trim().toLowerCase();
+      return type === "client government" || type === "client private";
+    })
+    .map(c => ({ value: c.company_id, label: c.company_name }));
   const islandOptions = locations.islands?.map((i: any) => ({ value: i.id, label: i.name })) || [];
   const formRegionOptions = locations.regions?.filter((r: any) => form.island_group_id ? r.island_group_id === form.island_group_id : true).map((r: any) => ({ value: r.id, label: r.name })) || [];
   const formProvinceOptions = locations.provinces?.filter((p: any) => form.region_id ? p.region_id === form.region_id : true).map((p: any) => ({ value: p.id, label: p.name })) || [];

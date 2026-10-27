@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Truck, Plus, Trash2, List, FileText, X, Search, Filter, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Edit2, Package, ArrowRightCircle, Printer, FileDown, CheckCircle2 } from 'lucide-react';
+import { Truck, Plus, Trash2, List, FileText, X, Search, Filter, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Edit2, Package, ArrowRightCircle, Printer, FileDown, CheckCircle2, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 
 //const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+// UPDATED: Fixed double-slash bug
 const getImageUrl = (path: string) => {
-    if (!path) return 'https://via.placeholder.com/150?text=No+Image';
+    if (!path) return '';
     if (path.startsWith('http')) return path;
-    return `/${path.replace('./', '')}`;
+    return path.startsWith('/') ? path : `/${path}`;
 };
 
 export default function DeliveryPage() {
@@ -173,7 +175,7 @@ export default function DeliveryPage() {
         if (res.ok) {
             setItemForm({ delivery_item_id: 0, project_item_component_id: 0, deliver_qty: 1, remarks: '' });
             setMaxAllowedQty(1);
-            fetch('/api/deliveries/${selectedDelivery.delivery_id}/items')
+            fetch(`/api/deliveries/${selectedDelivery.delivery_id}/items`)
                 .then(r => r.json()).then(d => setDeliveryItems(Array.isArray(d) ? d : []));
             fetch(`/api/projects/${selectedDelivery.project_id}/available-items`)
                 .then(r => r.json()).then(d => setAvailableProjItems(Array.isArray(d) ? d : []));
@@ -438,9 +440,22 @@ export default function DeliveryPage() {
                                         <tbody>
                                             {filteredItems.length === 0 ? <tr><td colSpan={4} className="px-4 py-12 text-center text-slate-400 italic">No items loaded yet.</td></tr> : filteredItems.map((i, idx) => (
                                                 <tr key={i.loading_list_id || idx} className="border-b border-slate-100 hover:bg-slate-50">
+                                                    
+                                                    {/* UPDATED IMAGE LOGIC */}
                                                     <td className="px-4 py-3">
-                                                        <img src={getImageUrl(i.image_path)} className="w-10 h-10 object-cover rounded border bg-white mx-auto" onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/150?text=No+Image'; }} />
+                                                        {i.image_path ? (
+                                                            <img 
+                                                                src={getImageUrl(i.image_path)} 
+                                                                className="w-10 h-10 object-cover rounded border bg-white mx-auto shadow-sm" 
+                                                                onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/150?text=No+Image'; }} 
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 bg-slate-100 rounded border flex items-center justify-center mx-auto">
+                                                                <ImageIcon className="h-4 w-4 text-slate-300" />
+                                                            </div>
+                                                        )}
                                                     </td>
+                                                    
                                                     <td className="px-4 py-3">
                                                         <div className="font-bold text-slate-800">{i.product_name}</div>
                                                         <div className="text-xs font-medium text-slate-500 mt-0.5"><span className="text-slate-400 mr-1">Part:</span> {i.supplier_product_name || i.item_name || 'Main Item'}</div>

@@ -343,7 +343,14 @@ export default function BiddingPage() {
   const classificationOptions = ["Goods", "Services"];
 
   // Filter Options
-  const companyOptions = (companies || []).map(c => ({ value: c.company_id, label: c.company_name }));
+  // const companyOptions = (companies || []).map(c => ({ value: c.company_id, label: c.company_name }));
+  const companyOptions = (companies || [])
+    .filter(c => {
+      // Safely check the type, convert to lowercase, and remove extra spaces
+      const type = (c.company_type || "").trim().toLowerCase();
+      return type === "client government" || type === "client private";
+    })
+    .map(c => ({ value: c.company_id, label: c.company_name }));
   const islandOptions = locations.islands?.map((i: any) => ({ value: i.id, label: i.name })) || [];
   const filterRegionOptions = locations.regions?.filter((r: any) => filters.island ? r.island_group_id === filters.island : true).map((r: any) => ({ value: r.id, label: r.name })) || [];
   const filterProvinceOptions = locations.provinces?.filter((p: any) => filters.region ? p.region_id === filters.region : true).map((p: any) => ({ value: p.id, label: p.name })) || [];

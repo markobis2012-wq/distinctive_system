@@ -496,7 +496,6 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                           </tr>
                         </thead>
                         <tbody>
-                          {/* Changed to filteredProducts! */}
                           {filteredProducts.length === 0 ? (
                             <tr>
                               <td colSpan={6} className="px-4 py-6 text-center text-slate-400 italic">
@@ -509,11 +508,11 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                                 <td className="px-4 py-3">
                                   {p.product_image ? (
                                     <img 
-                                        src={`${p.product_image}`} 
+                                        src={p.product_image.startsWith('/') ? p.product_image : `/${p.product_image}`} 
                                         alt={p.supplier_product_name} 
-                                        onClick={() => setEnlargedImage(`${p.product_image}`)}
+                                        onClick={() => setEnlargedImage(p.product_image.startsWith('/') ? p.product_image : `/${p.product_image}`)}
                                         className="h-10 w-10 object-cover rounded shadow-sm border border-slate-200 cursor-zoom-in hover:opacity-80 transition-opacity" 
-                                        />
+                                    />
                                   ) : (
                                     <div className="h-10 w-10 bg-slate-100 rounded flex items-center justify-center border border-slate-200"><ImageIcon className="h-4 w-4 text-slate-300" /></div>
                                   )}
@@ -570,7 +569,12 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                               <tr key={a.comp_attachments_id} className="border-b border-slate-100 hover:bg-slate-50">
                                 <td className="px-4 py-3">
                                   {a.file_path ? (
-                                    <img src={`${a.file_path}`} onClick={() => setEnlargedImage(`${a.file_path}`)} alt={a.file_name} className="h-10 w-10 object-cover rounded shadow-sm border border-slate-200 cursor-zoom-in hover:opacity-80" />
+                                    <img 
+                                        src={a.file_path.startsWith('/') ? a.file_path : `/${a.file_path}`} 
+                                        onClick={() => setEnlargedImage(a.file_path.startsWith('/') ? a.file_path : `/${a.file_path}`)} 
+                                        alt={a.file_name} 
+                                        className="h-10 w-10 object-cover rounded shadow-sm border border-slate-200 cursor-zoom-in hover:opacity-80" 
+                                    />
                                   ) : (
                                     <div className="h-10 w-10 bg-slate-100 rounded flex items-center justify-center border border-slate-200"><ImageIcon className="h-4 w-4 text-slate-300" /></div>
                                   )}
@@ -670,7 +674,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                     {previewUrl ? (
                         <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
                     ) : prodForm.product_image ? (
-                        <img src={`${prodForm.product_image}`} alt="Current" className="h-full w-full object-cover" />
+                        <img src={prodForm.product_image.startsWith('/') ? prodForm.product_image : `/${prodForm.product_image}`} alt="Current" className="h-full w-full object-cover" />
                     ) : (
                         <ImageIcon className="h-5 w-5 text-slate-300" />
                     )}
@@ -733,7 +737,7 @@ export default function CompanyDetailsPage({ params }: { params: Promise<{ id: s
                     {attPreviewUrl ? (
                       <img src={attPreviewUrl} className="h-full w-full object-cover" />
                     ) : attForm.file_path ? (
-                      <img src={`${attForm.file_path}`} className="h-full w-full object-cover" />
+                      <img src={attForm.file_path.startsWith('/') ? attForm.file_path : `/${attForm.file_path}`} className="h-full w-full object-cover" />
                     ) : (
                       <Paperclip className="h-5 w-5 text-slate-300" />
                     )}
