@@ -26,10 +26,19 @@ export default function PrintLoadingListPage({ params }: { params: Promise<{ id:
         const drRes = await fetch(`/api/deliveries/${deliveryId}`);
         if (drRes.ok) setDelivery(await drRes.json());
         
-        // UPDATED: Now fetches from the Unified Shipment Items endpoint!
+        // Fetches from the Unified Shipment Items endpoint
         const itemsRes = await fetch(`/api/deliveries/${deliveryId}/items`);
-        if (itemsRes.ok) setItems(await itemsRes.json());
-      } catch (err) { console.error(err); } finally { setLoading(false); }
+        if (itemsRes.ok) {
+          const data = await itemsRes.json();
+          // SAFETY FIX: Forces it to be an array so .length never crashes on empty trucks
+          setItems(Array.isArray(data) ? data : []);
+        }
+      } catch (err) { 
+        console.error(err); 
+        setItems([]);
+      } finally { 
+        setLoading(false); 
+      }
     };
     fetchData();
   }, [deliveryId]);
@@ -86,9 +95,8 @@ export default function PrintLoadingListPage({ params }: { params: Promise<{ id:
             <div style={{ border: '1px solid #888', padding: '10px' }}>{delivery.delivery_date}</div>
           </div>
 
-          {/* ITEMS TABLE */}
+          {/* ITEMS TABLE HEADER */}
           <div style={{ display: 'flex', fontSize: '14px', border: '1px solid #888', backgroundColor: '#f0f0f0', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', fontWeight: 'bold', textAlign: 'center' }}>
-            {/* CHANGED: "No." is now "Load" */}
             <div style={{ width: '50px', padding: '5px', borderRight: '1px solid #888' }}>Load</div>
             <div style={{ width: '140px', padding: '5px', borderRight: '1px solid #888' }}>Item Image</div>
             <div style={{ width: '150px', padding: '5px', borderRight: '1px solid #888' }}>Item Desc</div>
@@ -98,34 +106,47 @@ export default function PrintLoadingListPage({ params }: { params: Promise<{ id:
             <div style={{ flex: 1, padding: '5px', fontSize: '10px' }}>Remarks on Progression</div>
           </div>
 
+          {/* ITEMS TABLE BODY */}
           {pageItems.map((item, index) => {
             return (
               <div key={item.loading_list_id || index} style={{ display: 'flex', fontSize: '14px', border: '1px solid #888', borderTop: 'none', minHeight: '60px', alignItems: 'center' }}>
-                {/* CHANGED: ADDED THE WAREHOUSE CHECKBOX */}
+                
+                {/* WAREHOUSE CHECKBOX */}
                 <div style={{ width: '50px', padding: '5px', borderRight: '1px solid #888', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <div style={{ width: '20px', height: '20px', border: '2px solid #555', backgroundColor: '#fff', borderRadius: '3px' }}></div>
                 </div>
                 
-                {/* FIXED: DBOS Image Path uses .startsWith('/') */}
+                {/* 1st IMAGE: MAIN PROJECT ITEM (dbos_image_path) */}
                 <div style={{ width: '140px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center' }}>
                   {item.dbos_image_path && <img src={item.dbos_image_path.startsWith('/') ? item.dbos_image_path : `/${item.dbos_image_path}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
                 </div>
 
-                <div style={{ width: '150px', padding: '5px', borderRight: '1px solid #888' }}>{item.product_name}<br/><span style={{ fontSize:'10px' }}>{item.product_description}</span></div>
-                <div style={{ width: '240px', padding: '5px', borderRight: '1px solid #888' }}><b>{item.supplier_product_name || item.item_name}</b><br/>{item.prod_description}</div>
+                <div style={{ width: '150px', padding: '5px', borderRight: '1px solid #888' }}>
+                  {item.product_name}<br/>
+                  <span style={{ fontSize:'10px' }}>{item.product_description}</span>
+                </div>
                 
-                {/* FIXED: Removed hardcoded '/uploads/suppliers_product_images/' and applied startsWith('/') */}
+                <div style={{ width: '240px', padding: '5px', borderRight: '1px solid #888' }}>
+                  <b>{item.item_name}</b><br/>
+                  {item.prod_description}
+                </div>
+                
+                {/* 2nd IMAGE: COMPONENT PART IMAGE (component_image_path) */}
                 <div style={{ width: '140px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center' }}>
-                  {item.product_image && <img src={item.product_image.startsWith('/') ? item.product_image : `/${item.product_image}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
+                  {item.component_image_path && <img src={item.component_image_path.startsWith('/') ? item.component_image_path : `/${item.component_image_path}`} style={{ width: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="" />}
                 </div>
 
-                <div style={{ width: '100px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center', fontWeight: 'bold' }}>{item.item_qty || item.qty}</div>
-                <div style={{ flex: 1, padding: '5px' }}>{item.remarks}</div>
+                <div style={{ width: '100px', padding: '5px', borderRight: '1px solid #888', textAlign: 'center', fontWeight: 'bold' }}>
+                  {item.item_qty || item.qty}
+                </div>
+                <div style={{ flex: 1, padding: '5px' }}>
+                  {item.remarks}
+                </div>
               </div>
             );
           })}
 
-          {/* SIGNATORIES (Untouched to match your exact corporate layout) */}
+          {/* SIGNATORIES */}
           {pageIndex === pages.length - 1 && (
             <div style={{ marginTop: '20px', border: '1px solid #888' }}>
               <div style={{ fontSize: '16px', backgroundColor: '#b3b3b3', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', textAlign: 'center', padding: '5px', borderBottom: '1px solid #888', color: '#000' }}>

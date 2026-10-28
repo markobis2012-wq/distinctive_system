@@ -59,8 +59,10 @@ func GetUOMs() ([]UOM, error) {
 type ProjectPart struct {
 	PartID         int     `json:"project_item_component_id"`
 	ProjectItemsID int     `json:"project_items_id"`
+	InventoryID    int     `json:"inventory_id"` // <-- Added
 	PartName       string  `json:"part_name"`
 	Description    string  `json:"description"`
+	ImagePath      string  `json:"image_path"` // <-- Added
 	QtyPerItem     float64 `json:"qty_per_item"`
 	ProdQty        float64 `json:"prod_qty"`
 	ParentItemName string  `json:"parent_item_name,omitempty"`
@@ -69,12 +71,25 @@ type ProjectPart struct {
 }
 
 func GetPartsByProject(projectID int) ([]ProjectPart, error) {
+	// Added c.inventory_id and c.image_path to the SELECT statement
 	query := `
-		SELECT c.project_item_component_id, c.project_items_id, c.part_name, COALESCE(c.description, ''), c.qty_per_item, c.prod_qty, p.product_name, c.uom_id, COALESCE(um.uom_abbr, '')
+		SELECT 
+			c.project_item_component_id, 
+			c.project_items_id, 
+			COALESCE(c.inventory_id, 0),
+			c.part_name, 
+			COALESCE(c.description, ''), 
+			COALESCE(c.image_path, ''),
+			c.qty_per_item, 
+			c.prod_qty, 
+			p.product_name, 
+			c.uom_id, 
+			COALESCE(um.uom_abbr, '')
 		FROM tbl_project_item_component c
 		JOIN tbl_project_items p ON c.project_items_id = p.project_items_id
 		LEFT JOIN tbl_uom um ON c.uom_id = um.uom_id
 		WHERE p.project_id = ? ORDER BY c.project_item_component_id DESC`
+
 	rows, err := config.DB.Query(query, projectID)
 	if err != nil {
 		return nil, err
@@ -84,7 +99,20 @@ func GetPartsByProject(projectID int) ([]ProjectPart, error) {
 	var list []ProjectPart
 	for rows.Next() {
 		var p ProjectPart
-		if err := rows.Scan(&p.PartID, &p.ProjectItemsID, &p.PartName, &p.Description, &p.QtyPerItem, &p.ProdQty, &p.ParentItemName, &p.UomID, &p.UomAbbr); err == nil {
+		// Added &p.InventoryID and &p.ImagePath to the Scan in the exact order of the SELECT
+		if err := rows.Scan(
+			&p.PartID,
+			&p.ProjectItemsID,
+			&p.InventoryID,
+			&p.PartName,
+			&p.Description,
+			&p.ImagePath,
+			&p.QtyPerItem,
+			&p.ProdQty,
+			&p.ParentItemName,
+			&p.UomID,
+			&p.UomAbbr,
+		); err == nil {
 			list = append(list, p)
 		}
 	}

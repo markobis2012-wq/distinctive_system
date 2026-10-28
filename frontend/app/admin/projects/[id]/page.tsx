@@ -8,8 +8,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-// const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 const SearchableSelect = ({ options, value, onChange, placeholder = "Select..." }: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -80,7 +78,45 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
   // --- PARTS LIST STATES ---
   const [projectPartsList, setProjectPartsList] = useState<any[]>([]);
   const [activeItemForParts, setActiveItemForParts] = useState<any>(null);
-  const [partsForm, setPartsForm] = useState({ part_name: '', description: '', qty_per_item: 1, uom_id: 1 });
+  
+  // CustomPart toggle and partImage upload states
+  const [isCustomPart, setIsCustomPart] = useState(true);
+  const [partImage, setPartImage] = useState<File | null>(null);
+  const [partsForm, setPartsForm] = useState({ inventory_id: 0, part_name: '', description: '', qty_per_item: 1, uom_id: 1 });
+
+  // --- NEW: PART IMAGE UPDATE STATES & HELPERS ---
+  const updateImageInputRef = useRef<HTMLInputElement>(null);
+  const [updatingPartId, setUpdatingPartId] = useState<number | null>(null);
+
+  const getAssetPath = (path: string) => {
+    if (!path) return '';
+    return path.startsWith('/') ? path : `/${path}`;
+  };
+
+  const handleUpdatePartImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !updatingPartId) return;
+
+    const formData = new FormData();
+    formData.append('image_path', file);
+
+    try {
+      const res = await fetch(`/api/project-items/parts/${updatingPartId}/image`, {
+        method: 'PUT',
+        body: formData
+      });
+      if (res.ok) {
+        fetchParts(); 
+      } else {
+        alert("Failed to update image");
+      }
+    } catch (err) {
+      alert("Error uploading file");
+    } finally {
+      setUpdatingPartId(null);
+      if (updateImageInputRef.current) updateImageInputRef.current.value = '';
+    }
+  };
 
   // --- MASTER BOM STATES ---
   const [masterBOMList, setMasterBOMList] = useState<any[]>([]);
@@ -242,21 +278,44 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
   // --- PARTS LIST HANDLERS ---
   const fetchParts = async () => {
     const res = await fetch(`/api/projects/${projectId}/parts`);
-    setProjectPartsList(await safeParse(res) || []);
+    const data = await safeParse(res);
+    
+    // ADD THIS LOG: Check what properties exist on the objects
+    console.log("🛠️ FETCHED PARTS FROM BACKEND:", data); 
+    
+    setProjectPartsList(data || []);
   };
 
   const handleSavePart = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isCustomPart && partsForm.inventory_id === 0) return alert("Select an inventory item or switch to Custom Part");
+    if (isCustomPart && partsForm.part_name.trim() === '') return alert("Please enter the custom part name");
+
     const prodQty = (activeItemForParts?.qty || 1) * partsForm.qty_per_item;
+    
+    const formData = new FormData();
+    formData.append('project_items_id', String(activeItemForParts.project_items_id));
+    formData.append('inventory_id', String(isCustomPart ? 0 : partsForm.inventory_id));
+    formData.append('part_name', partsForm.part_name);
+    formData.append('description', partsForm.description);
+    formData.append('qty_per_item', String(partsForm.qty_per_item));
+    formData.append('prod_qty', String(prodQty));
+    formData.append('uom_id', String(partsForm.uom_id));
+    
+    if (partImage) formData.append('image_path', partImage);
     
     try {
       const res = await fetch('/api/project-items/parts', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_items_id: activeItemForParts.project_items_id, ...partsForm, prod_qty: prodQty })
+        method: 'POST', 
+        body: formData
       });
       if (res.ok) {
         fetchParts();
-        setPartsForm({ part_name: '', description: '', qty_per_item: 1, uom_id: 1 });
+        setPartsForm({ inventory_id: 0, part_name: '', description: '', qty_per_item: 1, uom_id: 1 });
+        setPartImage(null);
+        setIsCustomPart(true);
+      } else {
+        alert("Error saving part");
       }
     } catch (err) { alert("Error saving part"); }
   };
@@ -413,7 +472,6 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
     } catch (err) { }
   };
 
-  // UPDATED: Fixed missing slash for preview files
   const handlePreviewFile = (filePath: string, fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
     const url = filePath.startsWith('/') ? filePath : `/${filePath}`;
@@ -540,7 +598,6 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
 
                           return (
                           <tr key={item.project_items_id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                            {/* UPDATED: Fixed missing slash for images */}
                             <td className="px-4 py-2 flex gap-2">
                                 {item.image_path ? (
                                     <img 
@@ -843,6 +900,15 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* MODALS */}
+      
+      {/* Hidden input for updating part images */}
+      <input 
+        type="file" 
+        accept="image/*" 
+        ref={updateImageInputRef} 
+        className="hidden" 
+        onChange={handleUpdatePartImage} 
+      />
 
       {/* ADD FINISHED GOOD MODAL */}
       {isItemModalOpen && (
@@ -895,9 +961,44 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
               <div className="w-full lg:w-1/3 bg-slate-50 border-r border-slate-200 p-6 overflow-y-auto shrink-0">
                 <h4 className="font-bold text-slate-700 mb-4 border-b border-slate-200 pb-2">Add Physical Part</h4>
                 <form onSubmit={handleSavePart} className="space-y-4">
-                  <div><label className="block text-xs font-semibold mb-1">Part Name *</label><input required value={partsForm.part_name} onChange={e => setPartsForm({...partsForm, part_name: e.target.value})} placeholder="e.g. Table Top" className="w-full p-2 border rounded text-sm outline-none" /></div>
+                  
+                  {/* NEW: Toggle for Custom Part vs Inventory Search */}
+                  <div className="flex items-center gap-3 mb-2">
+                    <input type="checkbox" id="customPartToggle" checked={isCustomPart} onChange={e => setIsCustomPart(e.target.checked)} className="rounded text-emerald-600" />
+                    <label htmlFor="customPartToggle" className="text-xs font-bold text-emerald-600 uppercase cursor-pointer">Custom Part / Component</label>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Part Name / Accessory *</label>
+                    {isCustomPart ? (
+                      <input required value={partsForm.part_name} onChange={e => setPartsForm({...partsForm, part_name: e.target.value})} placeholder="e.g. Custom Table Top" className="w-full p-2 border rounded text-sm outline-none bg-white" />
+                    ) : (
+                      <SearchableSelect 
+                        options={inventoryOptions} 
+                        value={partsForm.inventory_id} 
+                        onChange={(v: string) => {
+                          const id = parseInt(v) || 0;
+                          const selectedInv = inventoryList.find(i => i.inventory_id === id);
+                          setPartsForm({
+                            ...partsForm,
+                            inventory_id: id,
+                            part_name: selectedInv ? selectedInv.inventory_name : '',
+                            uom_id: selectedInv ? selectedInv.uom_id : partsForm.uom_id
+                          });
+                        }} 
+                        placeholder="Search Accessories / Screws..." 
+                      />
+                    )}
+                  </div>
+                  
                   <div><label className="block text-xs font-semibold mb-1">Dimensions / Specs</label><input value={partsForm.description} onChange={e => setPartsForm({...partsForm, description: e.target.value})} placeholder="e.g. 4ft x 8ft" className="w-full p-2 border rounded text-sm outline-none" /></div>
                   
+                  {/* Image Upload for Part */}
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">Part / Component Image</label>
+                    <input type="file" accept="image/*" onChange={e => setPartImage(e.target.files ? e.target.files[0] : null)} className="w-full p-2 border rounded text-xs bg-white outline-none" />
+                  </div>
+
                   <div className="grid grid-cols-3 gap-3 bg-white p-3 rounded border border-slate-200">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase">Qty per Item</label>
@@ -936,7 +1037,44 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
 
                       return (
                         <tr key={p.project_item_component_id} className="border-b border-slate-100">
-                          <td className="px-4 py-3"><div className="font-bold text-slate-800">{p.part_name}</div><div className="text-xs text-slate-400">{p.description}</div></td>
+                          {/* UPDATED: Displays the image, includes Next.js rewrite handling, and adds Edit hover button */}
+                          <td className="px-4 py-3 flex gap-3 items-center">
+                            <div className="relative group shrink-0"> 
+                              {p.image_path ? (
+                                <img 
+                                  src={getAssetPath(p.image_path)} 
+                                  onClick={() => setEnlargedImage(getAssetPath(p.image_path))}
+                                  alt="Part" 
+                                  className="h-10 w-10 object-cover rounded border border-slate-200 cursor-zoom-in" 
+                                />
+                              ) : (
+                                <div className="h-10 w-10 bg-slate-100 rounded border border-slate-200 flex items-center justify-center">
+                                  <ImageIcon className="h-4 w-4 text-slate-300" />
+                                </div>
+                              )}
+                              
+                              {/* Edit Image Button (Appears on Hover) */}
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setUpdatingPartId(p.project_item_component_id);
+                                  updateImageInputRef.current?.click();
+                                }} 
+                                className="absolute -top-2 -right-2 bg-blue-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-blue-700"
+                                title="Update Image"
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </button>
+                            </div>
+
+                            <div>
+                              <div className="font-bold text-slate-800 flex items-center">
+                                {p.part_name}
+                                {p.inventory_id > 0 && <span className="ml-2 text-[9px] bg-blue-100 text-blue-800 px-1 py-0.5 rounded uppercase">Inventory</span>}
+                              </div>
+                              <div className="text-xs text-slate-400 max-w-[200px] truncate" title={p.description}>{p.description}</div>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-center text-xs">
                             Per Item: {p.qty_per_item} <span className="text-slate-400 font-bold uppercase ml-0.5">{partUom}</span><br />
                             <span className="font-bold text-blue-600 text-sm">
